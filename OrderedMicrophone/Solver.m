@@ -6,7 +6,7 @@ l = 0.3;
 std_noise = 0;
 freq = 1e6;
 speed_of_sound = 300;
-error_samples = (std_noise / speed_of_sound)*freq;
+error_samples = (std_noise / speed_of_sound) * freq;
 
 x1 = x + std_noise.*randn();
 y1 = y + std_noise.*randn();
