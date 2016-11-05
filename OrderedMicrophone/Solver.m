@@ -3,7 +3,7 @@ global l x1 y1;
 
 l = 0.3;
 
-std_noise = 0;
+std_noise = 3e-3;
 freq = 1e6;
 speed_of_sound = 300;
 error_samples = (std_noise / speed_of_sound) * freq;

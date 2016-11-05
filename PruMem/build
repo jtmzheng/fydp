@@ -1,0 +1,13 @@
+#!/bin/sh
+# This creates stuff memory info in cd /sys/class/uio/uio0/maps/map1
+
+echo /lib/firmware/EBB-PRU-ADC > $SLOTS
+cat $SLOTS
+lsmod
+rmmod uio_pruss
+modprobe uio_pruss extram_pool_sz=0x800000
+
+
+pasm -b memExample.p
+gcc mem2file.c -o mem2file
+gcc memExample.c -o memExample -lpthread -lprussdrv
