@@ -1,0 +1,63 @@
+// This program uploads data sent from the other PRU into memory
+
+.origin 0                        // start of program in PRU memory
+.entrypoint START                // program entry point (for a debugger)
+
+#define NOP                OR r1, r1, r1       // PRU NOP Operation
+.macro  MOV32
+.mparam dst, src
+    MOV     dst.w0, src & 0xFFFF
+    MOV     dst.w2, src >> 16
+.endm
+
+#define PRU0_R31_VEC_VALID 32    // allows notification of program completion
+#define PRU_EVTOUT_0       3        // the event number that is sent back
+#define DATA_AVAILABLE     1
+#define DATA_UNAVAILABLE   0
+#define STOP_CMD           2
+#define XFR_BANK           11
+
+#define NUM_XFR_BYTES      32                       // Number of bytes (including communication registers to transfer)
+#define RING_BUFFER_SIZE   8388576                  // Number of bytes of ring buffer
+#define NUM_DATA_BYTES     (NUM_XFR_BYTES - 8)      // Number of data bytes per batch transfer
+
+START:
+        // Enable the OCP master port
+        LBCO    r0, C4, 4, 4     // load SYSCFG reg into r0 (use c4 const addr)
+        CLR     r0, r0, 4        // clear bit 4 (STANDBY_INIT)
+        SBCO    r0, C4, 4, 4     // store the modified r0 back at the load addr
+        
+        MOV     r0, 0x00000000   // the address from which to load the address
+        LBBO    r1, r0, 0, 4     // load the Linux address that is passed
+        LBBO    r2, r0, 4, 4     // load the size that is passed
+        
+        MOV     r7, 0
+        
+        ADD     r3, r1, 8                  // r3 contains the current address to write
+        MOV32   r4, RING_BUFFER_SIZE    // r4 bytes left in ring buffer
+        MOV32   r5, 0                   // Ring buffer not full
+
+MAINLOOP: 
+        XIN     XFR_BANK, r7, NUM_XFR_BYTES             // Load registers from bank
+        QBEQ    MAINLOOP, r8, DATA_UNAVAILABLE          // Keep looping until data is available
+        MOV     r8, DATA_UNAVAILABLE
+        XOUT    XFR_BANK, r8, 4                         // Clear the data available register
+        
+        SBBO    r9, r3, 0, NUM_DATA_BYTES   // store EBB value to the address stored in r1
+        ADD     r3, r3, NUM_DATA_BYTES      // increment r3 address
+        SUB     r4, r4, NUM_DATA_BYTES      // decrement number of bytes left before reseting ring buffer
+        QBNE    FINISH_XFR, r4, 0           // Go to FINISH_XFR if ring buffer not full
+        
+        ADD     r3, r1, 8               // Reset Ring Buffer
+        MOV32   r4, RING_BUFFER_SIZE    // Reset bytes to write in ring buffer
+        ADD     r5, r5, 1                   // Ring buffer full
+        
+FINISH_XFR:
+        QBNE    MAINLOOP, r7, STOP_CMD  // keep looping until write memory filled
+        
+        //MOV     r4, 0x07080504
+        SBBO    r7, r1, 0, 4   // Store number of bytes left to fill in ring buffer
+        SBBO    r5, r1, 4, 4   // Store whether or not the ring buffer has been filled
+END:    
+        MOV     R31.b0, PRU0_R31_VEC_VALID | PRU_EVTOUT_0
+        HALT                     // halt the pru program
