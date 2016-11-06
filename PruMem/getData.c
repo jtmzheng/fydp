@@ -3,8 +3,8 @@
 #include <prussdrv.h>
 #include <pruss_intc_mapping.h>
 
-#define PRU_NUM	0   // using PRU0 for these examples
-#define PRU_ADC_NUM 1
+#define PRU_MEM_NUM	0   // using PRU0 for Memory
+#define PRU_ADC_NUM 1   // Use PRU1 for ADC
 #define MMAP_LOC "/sys/class/uio/uio0/maps/map1/"
 
 unsigned int readFileValue(char filename[]){
@@ -45,7 +45,7 @@ int main (void)
    prussdrv_pruintc_init(&pruss_intc_initdata);
 
    // Load and execute the PRU program on the PRU
-   prussdrv_exec_program (PRU_NUM, "./pruMem.bin");
+   prussdrv_exec_program (PRU_MEM_NUM, "./pruMem.bin");
    prussdrv_exec_program (PRU_ADC_NUM, "./pruADC.bin");
    
    printf("Running Program. Press any key to stop...");
@@ -59,7 +59,7 @@ int main (void)
    printf("EBB PRU program completed, event number %d.\n", n);
 
    // Disable PRU and close memory mappings
-   prussdrv_pru_disable(PRU_NUM);
+   prussdrv_pru_disable(PRU_MEM_NUM);
    prussdrv_pru_disable(PRU_ADC_NUM);
    prussdrv_exit ();
    return EXIT_SUCCESS;

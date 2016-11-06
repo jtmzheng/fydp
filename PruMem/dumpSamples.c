@@ -53,9 +53,11 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#define MAP_SIZE 0x0FFFFFFF
-#define MAP_MASK (MAP_SIZE)
-#define MMAP_LOC   "/sys/class/uio/uio0/maps/map1/"
+#define MAP_SIZE            0x0FFFFFFF
+#define MAP_MASK            (MAP_SIZE)
+#define MMAP_LOC            "/sys/class/uio/uio0/maps/map1/"
+#define HEADER_SIZE         (8)
+#define RING_BUFFER_SIZE    (8388576)
 
 unsigned int readFileValue(char filename[]){
    FILE* fp;
@@ -72,9 +74,10 @@ int main(int argc, char **argv) {
     unsigned long read_result, writeval;
     unsigned int addr = readFileValue(MMAP_LOC "addr");
     unsigned int dataSize = readFileValue(MMAP_LOC "size");
-    unsigned int numberOutputSamples = dataSize * 2;
+    unsigned int numberOutputSamples = RING_BUFFER_SIZE - HEADER_SIZE;
+    unsigned int ring_buffer_start, ring_buffer_rollover;
     off_t target = addr;
-
+    
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
 	numberOutputSamples = atoi(argv[1]);
@@ -93,13 +96,19 @@ int main(int argc, char **argv) {
     }
     fflush(stdout);
 
+    virt_addr = map_base + (target & MAP_MASK);
+    ring_buffer_start = *((uint32_t *) virt_addr);
+    virt_addr = map_base + ((target + 4) & MAP_MASK);
+    ring_buffer_rollover = read_result = *((uint8_t *) virt_addr);
+    printf("Ring_Buffer_Start: %d \nroll_Over: %d\n", ring_buffer_start, ring_buffer_rollover);
+        
     int i=0;
     for(i=0; i<numberOutputSamples; i++){
-        virt_addr = map_base + (target & MAP_MASK);
+        int cur_offset = (i + ring_buffer_start) % RING_BUFFER_SIZE;
+        virt_addr = map_base + ( (target + cur_offset) & MAP_MASK) + HEADER_SIZE;
         read_result = *((uint8_t *) virt_addr);
-        //printf("Value at address 0x%X (%p): 0x%X\n", target, virt_addr, read_result);
+        
         printf("%d %d\n",i, read_result);
-        target+=1;                   // 1 bytes per sample
     }
     fflush(stdout);
 

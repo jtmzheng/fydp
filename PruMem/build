@@ -10,5 +10,5 @@ modprobe uio_pruss extram_pool_sz=0x800000
 
 pasm -V3b pruMem.p
 pasm -V3b pruADC.p
-gcc mem2file.c -o mem2file
+gcc dumpSamples.c -o dumpSamples
 gcc getData.c -o getData -lpthread -lprussdrv
