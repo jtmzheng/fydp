@@ -78,6 +78,15 @@ int main(int argc, char **argv) {
     unsigned int ring_buffer_start, ring_buffer_rollover;
     off_t target = addr;
     
+    puts("Content-type: text/html\n");
+
+    puts("<!DOCTYPE html>");
+    puts("<head>");
+    puts("  <meta charset=\"utf-8\">");
+    puts("</head>");
+    puts("<body>");
+    puts("   <h3>Hello world!</h3>");
+    
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
 	numberOutputSamples = atoi(argv[1]);
@@ -117,5 +126,8 @@ int main(int argc, char **argv) {
        return -1;
     }
     close(fd);
+    
+    puts("</body>");
+    puts("</html>");
     return 0;
 }

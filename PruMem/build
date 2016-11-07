@@ -12,3 +12,5 @@ pasm -V3b pruMem.p
 pasm -V3b pruADC.p
 gcc dumpSamples.c -o dumpSamples
 gcc getData.c -o getData -lpthread -lprussdrv
+cp dumpSamples /usr/lib/cgi-bin/dumpSamples
+chmod +s /usr/lib/cgi-bin/dumpSamples

@@ -10,3 +10,7 @@ chmod +x build
 # Copy c and assembly files
 pscp *.c root@192.168.7.2:/root/pruData
 pscp *.p root@192.168.7.2:/root/pruData
+
+
+# Getting stuff from matlab:
+tmp = urlread('http://192.168.7.2:8080/cgi-bin/dumpSamples');
