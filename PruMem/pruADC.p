@@ -42,15 +42,20 @@
 #define DATA_UNAVAILABLE   0        // Value r8 to indicate data is unavailable (Set by other PRU to indicate data is processed)
 #define STOP_CMD           2        // Value for r7 to indicate that the program should halt
 
-#define NUM_XFR_BYTES      32       // Number of bytes to transfer (includes all shared registers)
-#define NUM_DATA_BYTES     (NUM_XFR_BYTES - 8)      // Number of data bytes per batch transfer (we subtract 8 to remove r7 and r8)
+#define NUM_COMM_BYTES     8                                        // Number of communication bytes per batch transfer
+#define NUM_DATA_BYTES     24                                       // Number of data bytes per batch transfer
+#define NUM_XFR_BYTES      (NUM_COMM_BYTES + NUM_DATA_BYTES)        // Number of bytes to transfer (includes all shared registers)
 
 START:  // Initialization (Set up ADC, read some dummy samples, etc.)
+        MOV     r7, 0                           // Reset r7
+        MOV     r8, DATA_UNAVAILABLE            // Reset r8
+        XOUT    XFR_BANK, r7, NUM_COMM_BYTES    // Reset the Communication Bytes
+        
         MOV     r8, DATA_AVAILABLE     // We transfer DATA_AVAILABLE in r8 whenever we send new data
-        MOV     r7, 0
+        
         MOV32   r1, (0x00000000 | ARM_PRU1_INTERRUPT)   // Create flag to clear linux interrupt
         SBCO    r1, CONST_PRUSSINTC, SICR_OFFSET, 4     // Some command to clear the linux interrupt
-        
+       
         MOV     r1, 0x00000000  // Set r1 as the temporary dummy register containing data to send over
         
 SAMPLE_COLLECTION:              // NOTE, we collect samples out of the loop first
@@ -133,11 +138,11 @@ MAINLOOP: // The NOP operations are to ensure that we always sample at a consist
         NOP
         MOV     r14.b3, r1
         ADD     r1, r1, 1
-        XOUT    XFR_BANK, r7, NUM_XFR_BYTES       // Move all samples to Bank0
+        XOUT    XFR_BANK, r9, NUM_DATA_BYTES    // Move all samples to Bank0
         
         MOV     r9.b0, r1
         ADD     r1, r1, 1
-        NOP
+        XOUT    XFR_BANK, r7, NUM_COMM_BYTES    // Inform PRU_MEM new data is available
         MOV     r9.b1, r1
         ADD     r1, r1, 1
         NOP
@@ -149,7 +154,7 @@ MAINLOOP: // The NOP operations are to ensure that we always sample at a consist
         QBBC    MAINLOOP, r31, PRU_R31_EVENT_SIG      // Exit when receive an interrupt
         
         MOV     r7, STOP_CMD
-        XOUT    XFR_BANK, r7, 8       // Inform PRU_MEM that we have finished
+        XOUT    XFR_BANK, r7, NUM_COMM_BYTES          // Inform PRU_MEM that we have finished
 END:
         //MOV     R31.b0, PRU0_R31_VEC_VALID | PRU_EVTOUT_0 // Not needed here because the other PRU signals Linux that execution is done
         HALT                    // halt the pru program

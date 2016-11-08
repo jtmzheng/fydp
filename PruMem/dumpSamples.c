@@ -58,6 +58,8 @@
 #define MMAP_LOC            "/sys/class/uio/uio0/maps/map1/"
 #define HEADER_SIZE         (8)
 #define RING_BUFFER_SIZE    (8388576)
+#define MAX(X, Y)           (((X) > (Y)) ? (X) : (Y))
+#define MIN(X, Y)           (((X) < (Y)) ? (X) : (Y))
 
 unsigned int readFileValue(char filename[]){
    FILE* fp;
@@ -74,7 +76,7 @@ int main(int argc, char **argv) {
     unsigned long read_result, writeval;
     unsigned int addr = readFileValue(MMAP_LOC "addr");
     unsigned int dataSize = readFileValue(MMAP_LOC "size");
-    unsigned int numberOutputSamples = RING_BUFFER_SIZE - HEADER_SIZE;
+    unsigned int numberOutputSamples = RING_BUFFER_SIZE;
     unsigned int ring_buffer_start, ring_buffer_rollover;
     off_t target = addr;
     
@@ -85,23 +87,23 @@ int main(int argc, char **argv) {
     puts("  <meta charset=\"utf-8\">");
     puts("</head>");
     puts("<body>");
-    puts("   <h3>Hello world!</h3>");
+    puts("   <h3>PRU ADC DATA</h3>");
     
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
-	numberOutputSamples = atoi(argv[1]);
+        numberOutputSamples = atoi(argv[1]);
     }
 
     if((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1){
-	printf("Failed to open memory!");
-	return -1;
+        printf("Failed to open memory!");
+        return -1;
     }
     fflush(stdout);
 
     map_base = mmap(0, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, target & ~MAP_MASK);
     if(map_base == (void *) -1) {
-       printf("Failed to map base address");
-       return -1;
+        printf("Failed to map base address");
+        return -1;
     }
     fflush(stdout);
 
@@ -109,17 +111,40 @@ int main(int argc, char **argv) {
     ring_buffer_start = *((uint32_t *) virt_addr);
     virt_addr = map_base + ((target + 4) & MAP_MASK);
     ring_buffer_rollover = read_result = *((uint8_t *) virt_addr);
-    printf("Ring_Buffer_Start: %d \nroll_Over: %d\n", ring_buffer_start, ring_buffer_rollover);
+    
+    if (ring_buffer_rollover == 0)
+    {
+        // ring_buffer has not rolled over
+        // Therefore the first address is zero, and num samples
+        // is right before the 'read'
         
+        numberOutputSamples = MIN(ring_buffer_start, numberOutputSamples);
+        ring_buffer_start = 0;   
+    }
+    else
+    {
+        numberOutputSamples = MIN(RING_BUFFER_SIZE, numberOutputSamples);
+    }
+    
+    printf("NumSamples: %d\n", numberOutputSamples);
+    
+    printf("0x");
     int i=0;
     for(i=0; i<numberOutputSamples; i++){
         int cur_offset = (i + ring_buffer_start) % RING_BUFFER_SIZE;
-        virt_addr = map_base + ( (target + cur_offset) & MAP_MASK) + HEADER_SIZE;
+        virt_addr = map_base + ( (target + cur_offset + HEADER_SIZE) & MAP_MASK);
         read_result = *((uint8_t *) virt_addr);
         
-        printf("%d %d\n",i, read_result);
+        printf("%02X", read_result);
     }
+    printf("\n");
     fflush(stdout);
+    
+    int cur_offset = (RING_BUFFER_SIZE - 1 + ring_buffer_start) % RING_BUFFER_SIZE;
+    virt_addr = map_base + ( (target + cur_offset + HEADER_SIZE) & MAP_MASK);
+    read_result = *((uint8_t *) virt_addr);
+
+    printf("%02X", read_result);
 
     if(munmap(map_base, MAP_SIZE) == -1) {
        printf("Failed to unmap memory");
@@ -129,5 +154,6 @@ int main(int argc, char **argv) {
     
     puts("</body>");
     puts("</html>");
+    fflush(stdout);
     return 0;
 }
