@@ -139,12 +139,6 @@ int main(int argc, char **argv) {
     }
     printf("\n");
     fflush(stdout);
-    
-    int cur_offset = (RING_BUFFER_SIZE - 1 + ring_buffer_start) % RING_BUFFER_SIZE;
-    virt_addr = map_base + ( (target + cur_offset + HEADER_SIZE) & MAP_MASK);
-    read_result = *((uint8_t *) virt_addr);
-
-    printf("%02X", read_result);
 
     if(munmap(map_base, MAP_SIZE) == -1) {
        printf("Failed to unmap memory");
