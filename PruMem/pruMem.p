@@ -42,8 +42,9 @@
 
 #define RING_BUFFER_SIZE   8388576                  // Number of bytes of ring buffer 
                                                     // (Should be divisibly by 3 AND number of registers per chunk) (Don't modify)
-#define NUM_XFR_BYTES      32                       // Number of bytes (including communication registers to transfer)
-#define NUM_DATA_BYTES     (NUM_XFR_BYTES - 8)      // Number of data bytes per batch transfer (we subtract 8 to remove r7 and r8)
+#define NUM_COMM_BYTES     8                                        // Number of communication bytes per batch transfer
+#define NUM_DATA_BYTES     24                                       // Number of data bytes per batch transfer
+#define NUM_XFR_BYTES      (NUM_COMM_BYTES + NUM_DATA_BYTES)        // Number of bytes to transfer (includes all shared registers)
 
 START:
         // Enable the OCP master port (Required for write to DDR3)
@@ -67,6 +68,7 @@ START:
 MAINLOOP: 
         XIN     XFR_BANK, r7, NUM_XFR_BYTES             // Load registers from bank
         QBEQ    MAINLOOP, r8, DATA_UNAVAILABLE          // Keep looping until data is available
+        QBEQ    FINISH_XFR, r7, STOP_CMD                // Jump to end if Top received
         MOV     r8, DATA_UNAVAILABLE                    // Set data unavailable 
         XOUT    XFR_BANK, r8, 4                         // Clear the data available register in shared memory
         

@@ -45,8 +45,10 @@ int main (void)
    prussdrv_pruintc_init(&pruss_intc_initdata);
 
    // Load and execute the PRU program on the PRU
-   prussdrv_exec_program (PRU_MEM_NUM, "./pruMem.bin");
    prussdrv_exec_program (PRU_ADC_NUM, "./pruADC.bin");
+   // We let pruADC get into a consistent state first 
+   usleep(100);
+   prussdrv_exec_program (PRU_MEM_NUM, "./pruMem.bin");
    
    printf("Running Program. Press any key to stop...");
    getchar();  
