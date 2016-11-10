@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
     
     printf("{\"NumSamples\": %d,\n", numberOutputSamples);
     
-    printf("\"Data:\":\"0x");
+    printf("\"Data\":\"0x");
     int i=0;
     for(i=0; i<numberOutputSamples; i++){
         int cur_offset = (i + ring_buffer_start) % RING_BUFFER_SIZE;
