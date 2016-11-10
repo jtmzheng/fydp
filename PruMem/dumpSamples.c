@@ -80,20 +80,13 @@ int main(int argc, char **argv) {
     unsigned int ring_buffer_start, ring_buffer_rollover;
     off_t target = addr;
     
-    puts("Content-type: text/html\n");
-
-    puts("<!DOCTYPE html>");
-    puts("<head>");
-    puts("  <meta charset=\"utf-8\">");
-    puts("</head>");
-    puts("<body>");
-    puts("   <h3>PRU ADC DATA</h3>");
+    puts("Content-type: application/json\n");
     
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
         numberOutputSamples = atoi(argv[1]);
     }
-
+    
     if((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1){
         printf("Failed to open memory!");
         return -1;
@@ -126,9 +119,9 @@ int main(int argc, char **argv) {
         numberOutputSamples = MIN(RING_BUFFER_SIZE, numberOutputSamples);
     }
     
-    printf("NumSamples: %d\n", numberOutputSamples);
+    printf("{\"NumSamples\": %d,\n", numberOutputSamples);
     
-    printf("0x");
+    printf("\"Data:\":\"0x");
     int i=0;
     for(i=0; i<numberOutputSamples; i++){
         int cur_offset = (i + ring_buffer_start) % RING_BUFFER_SIZE;
@@ -137,7 +130,7 @@ int main(int argc, char **argv) {
         
         printf("%02X", read_result);
     }
-    printf("\n");
+    printf("\"}\n");
     fflush(stdout);
 
     if(munmap(map_base, MAP_SIZE) == -1) {
@@ -146,8 +139,6 @@ int main(int argc, char **argv) {
     }
     close(fd);
     
-    puts("</body>");
-    puts("</html>");
     fflush(stdout);
     return 0;
 }

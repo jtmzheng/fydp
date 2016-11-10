@@ -3,6 +3,8 @@ http://exploringbeaglebone.com/chapter13/
 # Follow steps to get the pasm (PRU assembler in path)
 http://mythopoeic.org/bbb-pru-minimal/
 https://github.com/beagleboard/am335x_pru_package
+Get curl on Windows (To hit websites):
+http://winampplugins.co.uk/curl/
 
 After copying commands over, I suggest you run every
 command in build manually for the first time (The script is bad at reporting errors)
@@ -28,3 +30,9 @@ To get first 40 samples from memory:
 
 # Getting stuff from matlab:
 tmp = urlread('http://192.168.7.2:8080/cgi-bin/dumpSamples');
+
+=========================
+Setting Up Apache Server
+=========================
+1) In /etc/sudoers add:
+wwwdata    ALL=(ALL) /usr/local/bin/allowed-operation
