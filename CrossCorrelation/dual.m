@@ -1,57 +1,53 @@
-% To create a simple sinusoidal signal:
+%*************************************************************************
+% Written by: Samarth Kochhar
+% Mechatronics Engineering 
+% University of Waterloo
+% ID 20419203
+%*************************************************************************
+
+% initization
 clc;
 clear all;
 format compact;
 close all;
 % ------------------------------------------------------------------------
 
+% start clock
 tic;
 
-[y2,Fs] = audioread('iphoneRec.m4a');
-[y1,Fs] = audioread('macRec.aiff');
-[y3,Fs] = audioread('macRec.aiff');
-
-for i = 1:length(y3)
-    if i < length(y3)-40000
-         y3(i,1) = y3(i+40000,1);
-    else if i >= length(y3)-40000
-            y3(i,1) = 0;
+% import audio files from same directory as x-corr project
+[sample_1_data,sampling_freq] = audioread('macRec.aiff');
+[sample_2_data,sampling_freq] = audioread('iphoneRec.m4a');
+sample_3_data = sample_1_data;
+% sample 3 same as 1; force delay by 40000 samples to test program
+for i = 1:length(sample_3_data)
+    if i < length(sample_3_data)-40000
+         sample_3_data(i,1) = sample_3_data(i+40000,1);
+    else if i >= length(sample_3_data)-40000
+            sample_3_data(i,1) = 0;
         end
     end
 end
 
-y2 = y2(:,1);
+% audio file outputs as dual channel, take only one channel input
+sample_1_data = sample_1_data(1:length(sample_1_data),1);
 
-x1 = linspace(0,length(y1)/Fs,length(y1));
-x1 = x1';
-x2 = linspace(0,length(y2)/Fs,length(y2));
-x2 = x2';
-x3 = linspace(0,length(y3)/Fs,length(y3));
-x3 = x3';
+% audio file outputs as dual channel, take only one channel input
+sample_2_data = sample_2_data(:,1);
 
-y1 = y1(1:length(y2),1);
-x1 = x1(1:length(x2),1);
-y3 = 0.5*y3(1:length(y2),1);
-x3 = x3(1:length(x2),1);
+% audio file outputs as dual channel, take only one channel input
+% also scale amplitude by 0.5 to get some variation in audio signal
+sample_3_data = 0.5*sample_3_data(1:length(sample_3_data),1);
 
-% figure();
-% subplot(211)
-% plot(x1,y1)
-% subplot(212)
-% plot(x2,y2)
+% run a 3 signal x-correlation with lag_sample_time as output array
+lag_sample_time = x_correlate_tri(sample_1_data, sample_2_data, ...
+    sample_3_data, sampling_freq, sample_3_data);
 
+% sample lag = Real #
+lag_sample = abs(lag_sample_time(:,1));
 
-s1 = y1;
-t1 = x1;
-s2 = y2;
-t2 = x2;
-s3 = y3;
-t3 = x3;
+% time lag = sec
+lag_time = abs(lag_sample_time(:,2));
 
-AB = x_correlate_tri(s1, s2, s3, Fs, s3);
-
-lag_times = abs(AB(:,2)) 
-
-% [lag, time, f1, f2] = x_correlate_dual(s1,s2, Fs);
-
+% stop clock
 toc;
