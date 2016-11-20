@@ -18,13 +18,16 @@ res = zeros(size(R));
 
 for i=1:size(R,1)
     for k=1:size(R,2)
-        init_val = [5, pi/6];
-        f = @(x)delayFunc(x, F1(i, k) + err, F2(i, k) + err, l);
-        result = fsolve(f, init_val);
-        res(i, k) = result(2);  % only keep angle
+        theta = calcTheta(F1(i, k) + err, F2(i, k) + err, l);
+        res(i, k) = theta;  % only keep angle
     end
 end
 
 %% Plotting
 hold on;
-mesh(R, radtodeg(Theta), radtodeg(res - Theta));
+surf(R, radtodeg(Theta), abs(res - rad2deg(Theta)));
+grid on;
+title('\fontsize{16}Error in angle reconstruction with 1 [ms] timing error');
+xlabel('\fontsize{12}Distance [m]');
+ylabel('\fontsize{12}Angle [deg]');
+zlabel('\fontsize{12}Error [deg]');
