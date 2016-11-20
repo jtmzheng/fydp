@@ -17,15 +17,18 @@ type RawMicData struct {
 
 type MicData struct {
 	Name string
-	Data [3][]int
+	Data [][3]int 		// Each column is a microphones data
 }
 
-func UnInterleave(data *RawMicData) *MicData {
+func (data *RawMicData) UnInterleave(name string) *MicData {
 	str := data.Data[2:len(data.Data)]
-	mic := MicData{Name: "temp"}
-	for i := 0; i+2 < len(str); i += 2 {
-		c, _ := strconv.ParseInt(str[i:i+2], 16, 0)
-		mic.Data[(i/2)%3] = append(mic.Data[(i/2)%3], int(c))
+	mic := MicData{Name: name}
+	for i := 0; i < len(str); i += 6 {
+		// Write out row with columns for all 3 mics (TODO: Handle gracefully if one mic has more/less data)
+		a, _ := strconv.ParseInt(str[i:i+2], 16, 0)
+		b, _ := strconv.ParseInt(str[i+2:i+4], 16, 0)
+		c, _ := strconv.ParseInt(str[i+4:i+6], 16, 0)
+		mic.Data = append(mic.Data, [3]int{int(a), int(b), int(c)})
 	}
 
 	return &mic
@@ -70,7 +73,7 @@ func main() {
 	var data RawMicData
 	json.Unmarshal(file, &data)
 	fmt.Printf("NumSamples %v, len(data) %v\n", data.NumSamples, len(data.Data))
-	test := UnInterleave(&data)
+	test := data.UnInterleave("test")
 	test.WriteCsv(*outPath)
 	fmt.Printf("Done writing csv to %v\n", *outPath)
 }
