@@ -18,7 +18,7 @@ thPrime = atan2(sPrime(1), sPrime(2));
 % Constants
 l = 0.3;                % distance between microphones
 ss = 300;               % speed of sound (m/s)
-err = linspace(-0.001, 0.001, 10);  % up to 1 ms error
+err = linspace(-0.00002.*ss, 0.00002.*ss, 10);  % up to 0.02 ms error
 res = zeros(length(err).*length(err), 2);
 
 figure; hold on;
