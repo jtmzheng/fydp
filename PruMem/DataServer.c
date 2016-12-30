@@ -16,12 +16,19 @@ int main(int argc, char **argv) {
 
     size_t addr = read_file_value(MMAP_LOC "addr");
     size_t data_size = read_file_value(MMAP_LOC "size");
+    size_t numberOutputSamples = RING_BUFFER_SIZE;
     int ret = 0;
     int portno = 5555;
 
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
         portno = atoi(argv[1]);
+    }
+
+    if(argc>2){     // There is an argument -- lists number of samples to dump
+                    // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
+        numberOutputSamples = atoi(argv[1]);
+        numberOutputSamples = MIN(numberOutputSamples, RING_BUFFER_SIZE);
     }
 
     if (ret == 0)
