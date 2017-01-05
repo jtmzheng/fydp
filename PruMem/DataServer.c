@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
         printf("Server Started!\n");
     }
     
-    while (1)
+    while (ret == 0)
     {
 
         if (ret == 0)

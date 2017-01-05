@@ -22,7 +22,7 @@ int read_data(int aNewSockFd, char *aBuffer, int aBytesExpected)
 
         if (n < 0)
         {
-            printf("ERROR reading from socket");
+            printf("ERROR reading from socket\n");
             ret = -1;
         }
         else
@@ -46,7 +46,7 @@ int write_data(int aNewSockFd, char *aBuffer, int aBytesExpected)
 
         if (n < 0)
         {
-            printf("ERROR writing to socket");
+            printf("ERROR writing to socket\n");
             ret = -1;
         }
         else
@@ -74,7 +74,7 @@ int get_socket(int *pSockFd, int aPortNo, struct hostent *aServer)
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
-        printf("ERROR opening socket");
+        printf("ERROR opening socket\n");
         ret = -1;
     }
     
@@ -89,7 +89,7 @@ int get_socket(int *pSockFd, int aPortNo, struct hostent *aServer)
         
         if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0)
         {
-            printf("ERROR connecting");
+            printf("ERROR connecting\n");
             ret = -1;
         }
         else
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
     }
 
     buffer = malloc(RING_BUFFER_SIZE);
-    if (buffer == NULL)
+    if (!buffer)
     {
         printf("Error could not allocate data!");
         ret = -1;

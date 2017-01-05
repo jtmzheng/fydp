@@ -19,7 +19,7 @@ int read_data(int aNewSockFd, char *aBuffer, int aBytesExpected)
 
         if (n < 0)
         {
-            printf("ERROR reading from socket");
+            printf("ERROR reading from socket\n");
             ret = -1;
         }
         else
@@ -43,7 +43,7 @@ int write_data(int aNewSockFd, char *aBuffer, int aBytesExpected)
 
         if (n < 0)
         {
-            printf("ERROR writing to socket");
+            printf("ERROR writing to socket\n");
             ret = -1;
         }
         else
@@ -66,7 +66,7 @@ int start_server(comm_handle_t *pCommHandle, int aPortNo)
     pCommHandle->mSockFd = socket(AF_INET, SOCK_STREAM, 0);
     if (pCommHandle->mSockFd < 0)
     {
-        printf("ERROR opening socket");
+        printf("ERROR opening socket\n");
         ret = -1;
     }
 
@@ -80,7 +80,7 @@ int start_server(comm_handle_t *pCommHandle, int aPortNo)
                  (struct sockaddr *) &serv_addr,
                  sizeof(serv_addr)) < 0) 
         {
-            printf("ERROR on binding");
+            printf("ERROR on binding\n");
             ret = -1;
         }
     }
@@ -110,7 +110,7 @@ int get_request(comm_handle_t *pCommHandle)
 
     if (newsockfd < 0)
     {
-        printf("ERROR on accept");
+        printf("ERROR on accept\n");
         ret = -1;
     }
 

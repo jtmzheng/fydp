@@ -69,7 +69,7 @@ int get_buffer_from_file(const char *filename, uint8_t *aBuffer, int *pNumBytes)
 
         if (string == NULL)
         {
-            printf("Error could not allocate string!");
+            printf("Error could not allocate string!\n");
             ret = -1;
         }
     }
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
         printf("Server Started!\n");
     }
     
-    while (1)
+    while (ret == 0)
     {
 
         if (ret == 0)
