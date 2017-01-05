@@ -28,6 +28,15 @@ typedef struct data_buffer_s
     int mBufferSize[2];
 } data_buffer_t;
 
+
+// All communications is done in TCP,
+// this means that data is sent over in a connectioned protocal with in a 
+// guarentee that the order is what was origially sent
+// Steps that happen:
+// 1) Client requests X number of bytes
+// 2) Server sends integer Y, indicating the number of samples it actually will send
+// 3) Server sends Y bytes of data
+// 4) Server goes back to listening
 int start_server(comm_handle_t *pCommHandle, int aPortNo);
 
 int get_request(comm_handle_t *pCommHandle);

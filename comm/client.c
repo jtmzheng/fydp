@@ -113,11 +113,12 @@ int get_buffer(int aSockfd, int aNumRequestSamples, int *pNumActualSamples, char
     if (ret == 0)
     {
         // Read number of bytes sent
-        read_data(aSockfd, (char*)&actualSamples, 4);  
+        ret = read_data(aSockfd, (char*)&actualSamples, 4);
+
         actualSamples = ntohl(actualSamples);
         (*pNumActualSamples) = actualSamples;
 
-        if (actualSamples > RING_BUFFER_SIZE || actualSamples < 0)
+        if (actualSamples > RING_BUFFER_SIZE || actualSamples < 0 || ret != 0)
         {
             printf("Incomming buffer size invalid. Got: %d, max: %d\n", actualSamples, RING_BUFFER_SIZE);
             ret = -1;
@@ -127,7 +128,12 @@ int get_buffer(int aSockfd, int aNumRequestSamples, int *pNumActualSamples, char
     if (ret == 0)
     {
         // Read Data Received
-        read_data(aSockfd, aBuffer, actualSamples);
+        ret = read_data(aSockfd, aBuffer, actualSamples);
+
+        if (ret != 0)
+        {
+            printf("Error reading data!\n");
+        }
     }
     return ret;
 }
