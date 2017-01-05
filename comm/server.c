@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (buffer != NULL)
+    if (!buffer)
     {
         free(buffer);
     }
