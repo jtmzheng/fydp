@@ -1,0 +1,2 @@
+gcc ../PruMem/commUtils.c server.c -I../PruMem/ -o server;
+gcc client.c -o client;
