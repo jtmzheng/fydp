@@ -20,7 +20,7 @@ def tmp_callback():
     time.sleep(1)
     print ("Resuming!\n")
 
-def monitor_sound(callback_list, threshold):
+def monitor_sound(callback, threshold):
     """
     Go to Infinite Monitoring Loop
     Note: We close the old audio stream and create a new one each time
@@ -47,8 +47,7 @@ def monitor_sound(callback_list, threshold):
             silent = is_silent(snd_data, threshold)
 
         stream.stop_stream()
-        for callback in callback_list:
-            callback()
+        callback()
 
         # We should close the audio stream and create
         # a new one to ensure we don't look at new data
@@ -58,4 +57,4 @@ def monitor_sound(callback_list, threshold):
 
 if __name__ == '__main__':
     print("Starting Monitoring System!\n")
-    monitor_sound([tmp_callback], 10000)
+    monitor_sound(tmp_callback, 10000)
