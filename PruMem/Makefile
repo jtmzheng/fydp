@@ -12,7 +12,7 @@ DEPS = commUtils.o \
 all: $(TARGET)
 
 $(TARGET): clean $(DEPS) $(TARGET).c
-	$(CC) $(CFLAGS) $(DEPS) $(TARGET).c -o DataServer $(LDLIBS) -Wl
+	$(CC) $(CFLAGS) $(DEPS) $(TARGET).c -o DataServer $(LDLIBS)
 
 dataBuffer.o: dataBuffer.c
 	$(CC) $(CFLAGS) -c dataBuffer.c -o dataBuffer.o
