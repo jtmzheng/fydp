@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h> 
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -78,7 +78,7 @@ int start_server(comm_handle_t *pCommHandle, int aPortNo)
         serv_addr.sin_port = htons(aPortNo);
         if (bind(pCommHandle->mSockFd,
                  (struct sockaddr *) &serv_addr,
-                 sizeof(serv_addr)) < 0) 
+                 sizeof(serv_addr)) < 0)
         {
             printf("ERROR on binding\n");
             ret = -1;
@@ -104,7 +104,7 @@ int get_request(comm_handle_t *pCommHandle)
     memset(buffer, 0, sizeof(buffer));
 
     newsockfd = accept(pCommHandle->mSockFd,
-                       (struct sockaddr *) &cli_addr, 
+                       (struct sockaddr *) &cli_addr,
                        &clilen);
     printf("Got new Conection!\n");
 
@@ -117,9 +117,9 @@ int get_request(comm_handle_t *pCommHandle)
     if (ret == 0)
     {
         // Get number of bytes to send
-        int bytesDone = 0;   
+        int bytesDone = 0;
         ret = read_data(newsockfd, (char*)&numberOutputSamples, 4);
-        printf("Received Request!\n");
+        printf("Received Request %d!\n", numberOutputSamples);
     }
 
     if (ret == 0)
@@ -133,6 +133,7 @@ int get_request(comm_handle_t *pCommHandle)
         }
         pCommHandle->mNumOutputSamples = MIN(numberOutputSamples, RING_BUFFER_SIZE);
         printf("Number Output Samples: %d!\n", numberOutputSamples);
+        printf("pCommHandle->mNumOutputSamples: %d!\n", pCommHandle->mNumOutputSamples);
     }
 
     return ret;
@@ -146,7 +147,7 @@ int send_request(comm_handle_t *pCommHandle, data_buffer_t *pMappedDataBuffer)
     num_samples_to_send = MIN(pCommHandle->mNumOutputSamples, num_samples_to_send);
     num_samples_to_send_nt = htonl(num_samples_to_send);
 
-    printf("Sending Data Size\n");
+    printf("Sending Data Size: %d\n", num_samples_to_send);
     ret = write_data(pCommHandle->mNewSocketFd, (char*)&num_samples_to_send_nt, 4);
     if (ret == 0 && num_samples_to_send > 0)
     {
