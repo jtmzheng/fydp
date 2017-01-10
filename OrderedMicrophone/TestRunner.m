@@ -2,8 +2,8 @@
 clear; clc;
 
 % Test data
-r = linspace(0.3, 10, 10);
-theta = degtorad(linspace(0, 240, 36));
+r = linspace(2, 10, 10);
+theta = degtorad(linspace(-30, 30, 36));
 
 % Generate every test combination of r, theta
 [R, Theta] = meshgrid(r, theta);
@@ -11,7 +11,7 @@ theta = degtorad(linspace(0, 240, 36));
 % Constants
 l = 0.3;                % distance between microphones
 ss = 300;               % speed of sound (m/s)
-err = 0.001;
+err = 0.00002 .* ss;
 
 [F1, F2] = calcRelativeDelay(R, Theta, l);
 res = zeros(size(R));
@@ -27,7 +27,7 @@ end
 hold on;
 surf(R, radtodeg(Theta), abs(res - rad2deg(Theta)));
 grid on;
-title('\fontsize{16}Error in angle reconstruction with 1 [ms] timing error');
+title('\fontsize{16}Error in angle reconstruction with 0.02 [ms] timing error');
 xlabel('\fontsize{12}Distance [m]');
 ylabel('\fontsize{12}Angle [deg]');
 zlabel('\fontsize{12}Error [deg]');

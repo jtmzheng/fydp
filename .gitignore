@@ -1,3 +1,4 @@
 comm/client
 comm/server
 *.swp
+*.o
