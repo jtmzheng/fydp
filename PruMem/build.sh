@@ -15,4 +15,6 @@ gcc dumpSamples.c dataBuffer.c -o dumpSamples
 gcc getData.c -o getData -lpthread -lprussdrv
 cp dumpSamples /usr/lib/cgi-bin/dumpSamples
 chmod +s /usr/lib/cgi-bin/dumpSamples
-gcc DataServer.c dataBuffer.c commUtils.c pruCtrl.c -o DataServer -lpthread -lprussdrv
+
+# Run Makefile
+make all

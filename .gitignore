@@ -1,2 +1,3 @@
 comm/client
 comm/server
+*.o
