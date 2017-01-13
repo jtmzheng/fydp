@@ -8,6 +8,8 @@ import getopt
 import errno
 from socket import error as socket_error
 
+from monitor import Monitor
+
 MAX_CHUNK_SIZE = 4096
 DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
@@ -50,14 +52,14 @@ def read_int(sock):
         return None
     return socket.ntohl(struct.unpack('I', raw)[0])
 
-def read_buffer(sock, nsamples):
+def read_buffer(sock, nsamples=0):
     """Read buffer with n samples of data from socket
     """
     write_req(sock, nsamples)
     nsamples = read_int(sock)
+    print 'Reading %d samples' % nsamples
     buf = read_data(sock, nsamples)
-    print str(buf)
-    return
+    return buf
 
 def connect(host, port):
     """Tries to connect until timeout (if specified)
@@ -82,8 +84,37 @@ def connect(host, port):
             time.sleep(1)
     return s
 
+def deinterleave(buf):
+    assert len(buf) % 3 == 0
+    data = [[], [], []]
+    for i in range(0, len(buf), 3):
+        data[0].append(buf[i])
+        data[1].append(buf[i+1])
+        data[2].append(buf[i+2])
+    return data
+
+class BeagleReader:
+    """Reads data from Beaglebone
+    """
+    def __init__(self, host, port, samples=0):
+        """Given (host, port) Beaglebone is writing to
+        setup connection"""
+        self.host = host
+        self.port = port
+        self.samples = samples
+
+    def read(self):
+        """Read n samples from server (0 means all)
+        """
+        sock = connect(self.host, self.port)
+        buf = read_buffer(sock, self.samples)
+        data = deinterleave(buf)
+        return data
+
+
 def main(argv):
-    # Test data
+    """Main entry point of client
+    """
     portno = DEFAULT_PORT
     hostname = DEFAULT_HOSTNAME
 
@@ -103,9 +134,10 @@ def main(argv):
         print 'client.py -h <hostname> -p <port>'
         print 'Using default host localhost and default port 5555'
 
-    s = connect(hostname, portno)
-    buf = read_buffer(s, 10)
-    s.close()
+    m = Monitor(3000)
+    br = BeagleReader(hostname, portno, 9)
+    m.add_callback('[BeagleReader::read]', br.read)
+    m.monitor()
     return
 
 if __name__ == '__main__':
