@@ -7,12 +7,14 @@ import getopt
 
 import errno
 from socket import error as socket_error
+from multiprocessing import Pool
 
 from monitor import Monitor
 
 MAX_CHUNK_SIZE = 4096
 DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
+
 
 def read_data(sock, nbytes):
     """Read nbytes of data from socket
@@ -93,6 +95,7 @@ def deinterleave(buf):
         data[2].append(buf[i+2])
     return data
 
+
 class BeagleReader:
     """Reads data from Beaglebone
     """
@@ -103,6 +106,9 @@ class BeagleReader:
         self.port = port
         self.samples = samples
 
+    def __call__(self):
+        return self.read()
+
     def read(self):
         """Read n samples from server (0 means all)
         """
@@ -111,6 +117,20 @@ class BeagleReader:
         data = deinterleave(buf)
         return data
 
+
+class MultiBeagleReader:
+    """Reads data from Beaglebones
+    """
+    def __init__(self, readers, timeout=10):
+        self.readers = readers
+        self.timeout = timeout
+
+    def read(self):
+        pool = Pool(processes=min(len(self.readers), 4))
+        results = [pool.apply_async(reader, ()) for reader in self.readers]
+        bufs = [res.get(timeout=self.timeout) for res in results]
+        # TODO: Marshal into some structure
+        return bufs
 
 def main(argv):
     """Main entry point of client
@@ -135,8 +155,17 @@ def main(argv):
         print 'Using default host localhost and default port 5555'
 
     m = Monitor(3000)
-    br = BeagleReader(hostname, portno, 9)
-    m.add_callback('[BeagleReader::read]', br.read)
+
+    # NB: For testing I ran a second local server on port 5556
+    # TODO: Use different hosts/ports
+    br_1 = BeagleReader(hostname, portno, 9)
+    br_2 = BeagleReader(hostname, 5556, 9)
+
+    # NB: The design is to basically have something hold a MultiBeagleBone reader
+    # and that object would be what's attached to the Monitor instance
+    mbr = MultiBeagleReader([br_1, br_2])
+
+    m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()
     return
 
