@@ -5,6 +5,8 @@ import struct
 import time
 import getopt
 
+import locate
+
 import errno
 from socket import error as socket_error
 from multiprocessing import Pool
@@ -129,7 +131,13 @@ class MultiBeagleReader:
         pool = Pool(processes=min(len(self.readers), 4))
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
+
+"""
+        # Testing code (TODO: Remove)
+        arr1_buf = bufs[0] # 3 buffers in a list
+        print locate.xcorr(arr1_buf[0], arr1_buf[1])
         # TODO: Marshal into some structure
+"""
         return bufs
 
 def main(argv):
@@ -158,8 +166,8 @@ def main(argv):
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, 9)
-    br_2 = BeagleReader(hostname, 5556, 9)
+    br_1 = BeagleReader(hostname, portno, 30)
+    br_2 = BeagleReader(hostname, 5556, 30)
 
     # NB: The design is to basically have something hold a MultiBeagleBone reader
     # and that object would be what's attached to the Monitor instance
