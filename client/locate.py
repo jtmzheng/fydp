@@ -1,6 +1,7 @@
 import numpy as np
 
 from scipy.optimize import fsolve
+from scipy import signal
 
 import math
 
@@ -48,9 +49,9 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     return r_hat, theta_hat
 
 def xcorr(sig1, sig2):
-    """ Cross-correlation
+    """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
     """
-    corr = np.abs(np.correlate(sig1, sig2, "full"))
+    corr = signal.fftconvolve(sig1, sig2, mode='full')
     ind = np.argmax(corr)
     max_corr = np.amax(corr)
     return max_corr, ind

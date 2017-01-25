@@ -63,6 +63,7 @@ class Monitor:
 
             stream.stop_stream()
             for cb in self.callbacks.values():
+                print 'Calling monitor callback...'
                 ret = cb()
                 if len(ret) < 10:
                     print 'Callback returned "%s"' % ret
