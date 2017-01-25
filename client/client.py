@@ -106,7 +106,7 @@ class BeagleReader:
         setup connection"""
         self.host = host
         self.port = port
-        self.samples = samples
+        self.samples = samples*3 # 3 readings from 3 mics per sample
 
     def __call__(self):
         return self.read()
@@ -117,6 +117,7 @@ class BeagleReader:
         sock = connect(self.host, self.port)
         buf = read_buffer(sock, self.samples)
         data = deinterleave(buf)
+        print 'Finished reading data from socket'
         return data
 
 
@@ -128,15 +129,21 @@ class MultiBeagleReader:
         self.timeout = timeout
 
     def read(self):
-        pool = Pool(processes=min(len(self.readers), 4))
+        pool = Pool(processes=min(len(self.readers)+4, 4))
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
+        print 'Finished MultiBeagleReader read for all readers %d' % len(bufs)
+
+        # Clean up
+        pool.close()
+        pool.join()
 
 """
         # Testing code (TODO: Remove)
         arr1_buf = bufs[0] # 3 buffers in a list
         print locate.xcorr(arr1_buf[0], arr1_buf[1])
-        # TODO: Marshal into some structure
+        #TODO: Marshal into some structure (write out to sqlite db?)
+        #How do we want to display/analyze this data?
 """
         return bufs
 
@@ -166,12 +173,12 @@ def main(argv):
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, 30)
-    br_2 = BeagleReader(hostname, 5556, 30)
+    br_1 = BeagleReader(hostname, portno, 9)
+    # br_2 = BeagleReader(hostname, 5556, 30)
 
     # NB: The design is to basically have something hold a MultiBeagleBone reader
     # and that object would be what's attached to the Monitor instance
-    mbr = MultiBeagleReader([br_1, br_2])
+    mbr = MultiBeagleReader([br_1,])
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()
