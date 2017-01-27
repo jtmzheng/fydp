@@ -138,13 +138,11 @@ class MultiBeagleReader:
         pool.close()
         pool.join()
 
-"""
         # Testing code (TODO: Remove)
         arr1_buf = bufs[0] # 3 buffers in a list
         print locate.xcorr(arr1_buf[0], arr1_buf[1])
         #TODO: Marshal into some structure (write out to sqlite db?)
         #How do we want to display/analyze this data?
-"""
         return bufs
 
 def main(argv):
@@ -173,11 +171,11 @@ def main(argv):
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, 9)
+    br_1 = BeagleReader(hostname, portno, 0)
     # br_2 = BeagleReader(hostname, 5556, 30)
 
-    # NB: The design is to basically have something hold a MultiBeagleBone reader
-    # and that object would be what's attached to the Monitor instance
+    # NB: We want the whatever reader/consumer to write out structured data
+    # to persistent storage (ie with metadata, raw data, analysis, etc)
     mbr = MultiBeagleReader([br_1,])
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
