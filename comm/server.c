@@ -26,7 +26,7 @@ int hex_char_to_int(char aHexChar)
     }
     else if(aHexChar >= 'A' && aHexChar <= 'F')
     {
-        retVal = aHexChar - 'F' + 10;
+        retVal = aHexChar - 'A' + 10;
     }
     else if(aHexChar >= 'a' && aHexChar <= 'f')
     {
@@ -57,9 +57,9 @@ int get_buffer_from_file(const char *filename, uint8_t *aBuffer, int *pNumBytes)
         {
             printf("Could not open file!\n");
             ret = -1;
-        }    
+        }
     }
-    
+
     if (ret == 0)
     {
         fseek(f, 0, SEEK_END);
@@ -73,12 +73,13 @@ int get_buffer_from_file(const char *filename, uint8_t *aBuffer, int *pNumBytes)
             ret = -1;
         }
     }
-    
+
     if (ret == 0)
     {
         fread(string, fsize, 1, f);
         fclose(f);
         string[fsize] = 0;
+        //printf("string: %s\n", string);
         for (hex_start = 0; hex_start < fsize; hex_start++)
         {
             if (strncmp(string+hex_start, ":\"0x", 4) == 0)
@@ -97,8 +98,8 @@ int get_buffer_from_file(const char *filename, uint8_t *aBuffer, int *pNumBytes)
         {
             if (is_valid_hex(*(string+cur_idx)) && is_valid_hex(*(string+cur_idx+1)))
             {
-                //printf("%c%c %d\n", *(string+cur_idx), *(string+cur_idx+1), cur_idx);
                 aBuffer[num_bytes] = get_hex_byte(string+cur_idx);
+                //printf("%c%c %d %d\n", *(string+cur_idx), *(string+cur_idx+1), cur_idx, aBuffer[num_bytes]);
                 num_bytes++;
             }
             else
@@ -111,7 +112,7 @@ int get_buffer_from_file(const char *filename, uint8_t *aBuffer, int *pNumBytes)
         (*pNumBytes) = num_bytes;
     }
     printf("NumBytes: %d\n", num_bytes);
-    
+
     if (string != NULL)
     {
         free(string);
@@ -128,9 +129,9 @@ int main(int argc, char *argv[])
     int num_bytes;
     int ret = 0;
     int portno = 5555;
-    
+
     if(argc>1){     // There is an argument -- lists number of samples to dump
-                    // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
+                    // this defaults to the total DDR Memory Pool x 2 (16-bit samples)
         portno = atoi(argv[1]);
     }
 
@@ -149,7 +150,7 @@ int main(int argc, char *argv[])
         mapped_data_buffer.mData[0] = buffer;
         mapped_data_buffer.mData[1] = NULL;
         mapped_data_buffer.mBufferSize[0] = num_bytes;
-        mapped_data_buffer.mBufferSize[1] = 0;        
+        mapped_data_buffer.mBufferSize[1] = 0;
     }
 
     if (ret == 0)
@@ -158,7 +159,7 @@ int main(int argc, char *argv[])
         ret = start_server(&command_handle, portno);
         printf("Server Started!\n");
     }
-    
+
     while (ret == 0)
     {
 
