@@ -145,11 +145,11 @@ class MultiBeagleReader:
         for i in range(len(bufs)):
             arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
-            mic_id = db.create_mic(exp_id, i, mic_id=0, data=', '.join(str(v) for v in buf[0]), delay=0)
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
             for j in range(1, len(bufs[i])):
                 # For now use first signal as baseline (may have negative delay, which is fine)
                 _, delay = locate.xcorr(buf[0], buf[j])
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=', '.join(str(v) for v in buf[j]), delay=delay)
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=','.join(str(v) for v in buf[j]), delay=delay)
 
         return bufs
 
