@@ -6,6 +6,7 @@ import time
 import getopt
 
 import locate
+import db
 
 import errno
 from socket import error as socket_error
@@ -101,11 +102,13 @@ def deinterleave(buf):
 class BeagleReader:
     """Reads data from Beaglebone
     """
-    def __init__(self, host, port, samples=0):
+    def __init__(self, host, port, x=0, y=0, samples=0):
         """Given (host, port) Beaglebone is writing to
         setup connection"""
         self.host = host
         self.port = port
+        self.x = x
+        self.y = y
         self.samples = samples*3 # 3 readings from 3 mics per sample
 
     def __call__(self):
@@ -132,17 +135,22 @@ class MultiBeagleReader:
         pool = Pool(processes=min(len(self.readers)+4, 4))
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
-        print 'Finished MultiBeagleReader read for all readers %d' % len(bufs)
 
         # Clean up
         pool.close()
         pool.join()
 
-        # Testing code (TODO: Remove)
-        arr1_buf = bufs[0] # 3 buffers in a list
-        print locate.xcorr(arr1_buf[0], arr1_buf[1])
-        #TODO: Marshal into some structure (write out to sqlite db?)
-        #How do we want to display/analyze this data?
+        # NB: Write data to db, order of arrays/mics is arbitrary
+        exp_id = db.create_experiment()
+        for i in range(len(bufs)):
+            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
+            buf = bufs[i]
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=', '.join(str(v) for v in buf[0]), delay=0)
+            for j in range(1, len(bufs[i])):
+                # For now use first signal as baseline (may have negative delay, which is fine)
+                _, delay = locate.xcorr(buf[0], buf[j])
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=', '.join(str(v) for v in buf[j]), delay=delay)
+
         return bufs
 
 def main(argv):
@@ -171,8 +179,8 @@ def main(argv):
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, 0)
-    # br_2 = BeagleReader(hostname, 5556, 30)
+    br_1 = BeagleReader(hostname, portno, x=0, y=0, samples=3)
+    # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
