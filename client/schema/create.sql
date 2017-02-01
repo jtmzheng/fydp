@@ -2,7 +2,9 @@
 
 CREATE TABLE IF NOT EXISTS experiment (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    datetime    INTEGER
+    datetime    INTEGER,
+    x           REAL,
+    y           REAL
 );
 
 /* Microphone array */

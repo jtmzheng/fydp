@@ -4,11 +4,11 @@ import math
 import struct
 import time
 import getopt
+import errno
 
 import locate
 import db
 
-import errno
 from socket import error as socket_error
 from multiprocessing import Pool
 
@@ -102,7 +102,7 @@ def deinterleave(buf):
 class BeagleReader:
     """Reads data from Beaglebone
     """
-    def __init__(self, host, port, x=0, y=0, samples=0):
+    def __init__(self, host, port, x, y, samples=0):
         """Given (host, port) Beaglebone is writing to
         setup connection"""
         self.host = host
@@ -127,9 +127,11 @@ class BeagleReader:
 class MultiBeagleReader:
     """Reads data from Beaglebones
     """
-    def __init__(self, readers, timeout=10):
+    def __init__(self, readers, x, y, timeout=10):
         self.readers = readers
         self.timeout = timeout
+        self.src_x = x
+        self.src_y = y
 
     def read(self):
         pool = Pool(processes=min(len(self.readers)+4, 4))
@@ -141,7 +143,7 @@ class MultiBeagleReader:
         pool.join()
 
         # NB: Write data to db, order of arrays/mics is arbitrary
-        exp_id = db.create_experiment()
+        exp_id = db.create_experiment(self.src_x, self.src_y)
         for i in range(len(bufs)):
             arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
@@ -175,16 +177,25 @@ def main(argv):
         print 'client.py -h <hostname> -p <port>'
         print 'Using default host localhost and default port 5555'
 
+
+    # Parse user input (TODO: Some sort of config file?)
+    print 'Enter sound source location:'
+    src_x = float(raw_input('x: '))
+    src_y = float(raw_input('y: '))
+    print 'Enter array 1 position:'
+    x1 = float(raw_input('x: '))
+    y1 = float(raw_input('y: '))
+
     m = Monitor(3000)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, x=0, y=0, samples=3)
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, samples=0)
     # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
-    mbr = MultiBeagleReader([br_1,])
+    mbr = MultiBeagleReader([br_1,], src_x, src_y)
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()

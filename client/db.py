@@ -15,10 +15,10 @@ def with_cursor(func):
     return query
 
 @with_cursor
-def create_experiment(cur):
+def create_experiment(cur, src_x, src_y):
     try:
-        cur.execute('INSERT INTO experiment(datetime) VALUES (:datetime)',
-            {'datetime': int(time.time())})
+        cur.execute('INSERT INTO experiment(datetime, x, y) VALUES (:datetime, :x, :y)',
+            {'datetime': int(time.time()), 'x': src_x, 'y': src_y})
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating experiment: %s' % s.message
