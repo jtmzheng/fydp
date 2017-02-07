@@ -3,3 +3,4 @@ comm/server
 *.swp
 *.o
 *.pyc
+*.db

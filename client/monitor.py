@@ -65,10 +65,7 @@ class Monitor:
             for cb in self.callbacks.values():
                 print 'Calling monitor callback...'
                 ret = cb()
-                if len(ret) < 10:
-                    print 'Callback returned "%s"' % ret
-                else:
-                    print 'Callback returned %d size retval' % len(ret)
+                print 'Callback returned %d size retval' % len(ret)
 
             # We should close the audio stream and create
             # a new one to ensure we don't look at new data

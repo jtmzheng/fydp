@@ -4,10 +4,11 @@ import math
 import struct
 import time
 import getopt
+import errno
 
 import locate
+import db
 
-import errno
 from socket import error as socket_error
 from multiprocessing import Pool
 
@@ -101,11 +102,13 @@ def deinterleave(buf):
 class BeagleReader:
     """Reads data from Beaglebone
     """
-    def __init__(self, host, port, samples=0):
+    def __init__(self, host, port, x, y, samples=0):
         """Given (host, port) Beaglebone is writing to
         setup connection"""
         self.host = host
         self.port = port
+        self.x = x
+        self.y = y
         self.samples = samples*3 # 3 readings from 3 mics per sample
 
     def __call__(self):
@@ -124,27 +127,32 @@ class BeagleReader:
 class MultiBeagleReader:
     """Reads data from Beaglebones
     """
-    def __init__(self, readers, timeout=10):
+    def __init__(self, readers, x, y, timeout=10):
         self.readers = readers
         self.timeout = timeout
+        self.src_x = x
+        self.src_y = y
 
     def read(self):
         pool = Pool(processes=min(len(self.readers)+4, 4))
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
-        print 'Finished MultiBeagleReader read for all readers %d' % len(bufs)
 
         # Clean up
         pool.close()
         pool.join()
 
-"""
-        # Testing code (TODO: Remove)
-        arr1_buf = bufs[0] # 3 buffers in a list
-        print locate.xcorr(arr1_buf[0], arr1_buf[1])
-        #TODO: Marshal into some structure (write out to sqlite db?)
-        #How do we want to display/analyze this data?
-"""
+        # NB: Write data to db, order of arrays/mics is arbitrary
+        exp_id = db.create_experiment(self.src_x, self.src_y)
+        for i in range(len(bufs)):
+            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
+            buf = bufs[i]
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
+            for j in range(1, len(bufs[i])):
+                # For now use first signal as baseline (may have negative delay, which is fine)
+                _, delay = locate.xcorr(buf[0], buf[j])
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=','.join(str(v) for v in buf[j]), delay=delay)
+
         return bufs
 
 def main(argv):
@@ -169,16 +177,25 @@ def main(argv):
         print 'client.py -h <hostname> -p <port>'
         print 'Using default host localhost and default port 5555'
 
+
+    # Parse user input (TODO: Some sort of config file?)
+    print 'Enter sound source location:'
+    src_x = float(raw_input('x: '))
+    src_y = float(raw_input('y: '))
+    print 'Enter array 1 position:'
+    x1 = float(raw_input('x: '))
+    y1 = float(raw_input('y: '))
+
     m = Monitor(3000)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, 9)
-    # br_2 = BeagleReader(hostname, 5556, 30)
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, samples=0)
+    # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
 
-    # NB: The design is to basically have something hold a MultiBeagleBone reader
-    # and that object would be what's attached to the Monitor instance
-    mbr = MultiBeagleReader([br_1,])
+    # NB: We want the whatever reader/consumer to write out structured data
+    # to persistent storage (ie with metadata, raw data, analysis, etc)
+    mbr = MultiBeagleReader([br_1,], src_x, src_y)
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()

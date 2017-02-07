@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from scipy.optimize import fsolve
 from scipy import signal
@@ -6,6 +7,13 @@ from scipy import signal
 import math
 
 SPEED_SOUND = 300 # [m]
+WINDOW_SIZE = 5000
+
+def movmax(seq, window=1):
+    """Moving windowed max over seq of input window size
+    """
+    #assert len(seq) >= window
+    return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).max().values.T[0]
 
 def calc_rel_delay(r, theta, l):
     """Generate ideal relative delay (f1, f2) given (r, theta) and l
@@ -51,8 +59,18 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
     """
-    corr = signal.fftconvolve(sig1, sig2, mode='full')
-    ind = np.argmax(corr)
+    n = len(sig1)
+    sig1 = np.abs(sig1 - np.mean(sig1))
+    sig2 = np.abs(sig2 - np.mean(sig2))
+
+    sig1 = movmax(sig1, WINDOW_SIZE)
+    sig2 = movmax(sig2, WINDOW_SIZE)
+
+    # NB: This matches MATLAB's xcorr functionality
+    corr = np.abs(signal.fftconvolve(sig1, sig2[::-1], mode='full'))
+    inds = [-(n-1) + i for i in xrange(len(corr))] #TODO: Replace with O(1) calc...
+    ind = inds[np.argmax(corr)] # remapping to proper range
+
     max_corr = np.amax(corr)
     return max_corr, ind
 
