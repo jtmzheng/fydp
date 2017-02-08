@@ -5,6 +5,7 @@ import struct
 import time
 import getopt
 import errno
+import numpy as np
 
 import locate
 import db
@@ -33,12 +34,7 @@ def read_data(sock, nbytes):
         # NB: It actually doesn't really make a difference
         # if we decide to use socket.MSG_WAITALL...
         nbytes -= len(data)
-
-    output = []
-    for i in range(0, len(buf)):
-        c = struct.unpack('c', buf[i])
-        output.append(ord(c[0]))
-
+    output = np.fromstring(buf, dtype=np.uint8)
     return output
 
 def write_req(sock, nsamples):
@@ -89,16 +85,6 @@ def connect(host, port):
             time.sleep(1)
     return s
 
-def deinterleave(buf):
-    assert len(buf) % 3 == 0
-    data = [[], [], []]
-    for i in range(0, len(buf), 3):
-        data[0].append(buf[i])
-        data[1].append(buf[i+1])
-        data[2].append(buf[i+2])
-    return data
-
-
 class BeagleReader:
     """Reads data from Beaglebone
     """
@@ -119,7 +105,9 @@ class BeagleReader:
         """
         sock = connect(self.host, self.port)
         buf = read_buffer(sock, self.samples)
-        data = deinterleave(buf)
+        assert(buf.shape[0] % 3 == 0)
+
+        data = buf.reshape(3, buf.shape[0]/3)
         print 'Finished reading data from socket'
         return data
 
