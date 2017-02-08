@@ -34,7 +34,6 @@ def read_data(sock, nbytes):
         # NB: It actually doesn't really make a difference
         # if we decide to use socket.MSG_WAITALL...
         nbytes -= len(data)
-
     output = np.fromstring(buf, dtype=np.uint8)
     return output
 
