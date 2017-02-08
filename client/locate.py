@@ -68,10 +68,11 @@ def xcorr(sig1, sig2):
 
     # NB: This matches MATLAB's xcorr functionality
     corr = np.abs(signal.fftconvolve(sig1, sig2[::-1], mode='full'))
-    inds = [-(n-1) + i for i in xrange(len(corr))] #TODO: Replace with O(1) calc...
-    ind = inds[np.argmax(corr)] # remapping to proper range
 
-    max_corr = np.amax(corr)
+    arg_max = np.argmax(corr)
+    ind = arg_max - (n-1)
+
+    max_corr = corr[arg_max]
     return max_corr, ind
 
 

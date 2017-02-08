@@ -107,7 +107,7 @@ class BeagleReader:
         buf = read_buffer(sock, self.samples)
         assert(buf.shape[0] % 3 == 0)
 
-        data = buf.reshape(3, buf.shape[0]/3)
+        data = buf.reshape((3, buf.shape[0]/3), order='F')
         print 'Finished reading data from socket'
         return data
 
@@ -132,9 +132,12 @@ class MultiBeagleReader:
 
         # NB: Write data to db, order of arrays/mics is arbitrary
         exp_id = db.create_experiment(self.src_x, self.src_y)
+
         for i in range(len(bufs)):
             arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
+            # TODO: create_mic is really slow. Change this to binary stuff
+            # http://stackoverflow.com/questions/18621513/python-insert-numpy-array-into-sqlite3-database
             mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
             for j in range(1, len(bufs[i])):
                 # For now use first signal as baseline (may have negative delay, which is fine)
