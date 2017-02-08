@@ -138,15 +138,15 @@ class MultiBeagleReader:
             buf = bufs[i]
             # TODO: create_mic is really slow. Change this to binary stuff
             # http://stackoverflow.com/questions/18621513/python-insert-numpy-array-into-sqlite3-database
-            mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=buf[0], delay=0)
             for j in range(1, len(bufs[i])):
                 # For now use first signal as baseline (may have negative delay, which is fine)
                 _, delay = locate.xcorr(buf[0], buf[j])
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=','.join(str(v) for v in buf[j]), delay=delay)
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j], delay=delay)
 
         return bufs
 
-def main(argv):
+def run(argv):
     """Main entry point of client
     """
     portno = DEFAULT_PORT
@@ -191,6 +191,3 @@ def main(argv):
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()
     return
-
-if __name__ == '__main__':
-    main(sys.argv[1:])
