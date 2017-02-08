@@ -34,6 +34,7 @@ def read_data(sock, nbytes):
         # NB: It actually doesn't really make a difference
         # if we decide to use socket.MSG_WAITALL...
         nbytes -= len(data)
+
     output = np.fromstring(buf, dtype=np.uint8)
     return output
 
@@ -107,7 +108,7 @@ class BeagleReader:
         buf = read_buffer(sock, self.samples)
         assert(buf.shape[0] % 3 == 0)
 
-        data = buf.reshape(3, buf.shape[0]/3)
+        data = buf.reshape((3, buf.shape[0]/3), order='F')
         print 'Finished reading data from socket'
         return data
 
@@ -132,10 +133,13 @@ class MultiBeagleReader:
 
         # NB: Write data to db, order of arrays/mics is arbitrary
         exp_id = db.create_experiment(self.src_x, self.src_y)
+
         for i in range(len(bufs)):
             arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
+
             mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
+
             for j in range(1, len(bufs[i])):
                 # For now use first signal as baseline (may have negative delay, which is fine)
                 _, delay = locate.xcorr(buf[0], buf[j])
