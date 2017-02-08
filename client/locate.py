@@ -60,7 +60,6 @@ def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
     """
     n = len(sig1)
-    start = time.time()
     sig1 = np.abs(sig1 - np.mean(sig1))
     sig2 = np.abs(sig2 - np.mean(sig2))
 
