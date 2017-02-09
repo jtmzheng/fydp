@@ -126,27 +126,34 @@ class MultiBeagleReader:
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
 
-        # Clean up
-        pool.close()
-        pool.join()
-
         # NB: Write data to db, order of arrays/mics is arbitrary
         exp_id = db.create_experiment(self.src_x, self.src_y)
 
         for i in range(len(bufs)):
             arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
-            # TODO: create_mic is really slow. Change this to binary stuff
-            # http://stackoverflow.com/questions/18621513/python-insert-numpy-array-into-sqlite3-database
-            mic_id = db.create_mic(exp_id, i, mic_id=0, data=','.join(str(v) for v in buf[0]), delay=0)
+
+            # Asynchronously calculate xcorr for each mic to baseline mic
+            results = []
             for j in range(1, len(bufs[i])):
                 # For now use first signal as baseline (may have negative delay, which is fine)
-                _, delay = locate.xcorr(buf[0], buf[j])
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=','.join(str(v) for v in buf[j]), delay=delay)
+                results.append(pool.apply_async(locate.xcorr, args=(buf[0], buf[j])))
 
+            # NB: Quick and dirty way of getting just the delay out of (xcorr, delay) tuple
+            delays = [res.get(timeout=self.timeout)[1] for res in results]
+
+            # sqlite only supports synchronous updates
+            assert len(delays) == len(bufs[i]) - 1
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=buf[0], delay=0)
+            for j in range(1, len(bufs[i])):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j], delay=delays[j-1])
+
+        # Clean up
+        pool.close()
+        pool.join()
         return bufs
 
-def main(argv):
+def run(argv):
     """Main entry point of client
     """
     portno = DEFAULT_PORT
@@ -191,6 +198,3 @@ def main(argv):
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()
     return
-
-if __name__ == '__main__':
-    main(sys.argv[1:])
