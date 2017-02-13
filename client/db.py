@@ -6,9 +6,11 @@ import numpy as np
 def adapt_array(arr):
     """
     http://stackoverflow.com/a/31312102/190597 (SoulNibbler)
+    NB: np.save(out, arr) would save the file in npy format (with a variable length
+    header which is too annoying to parse
     """
     out = io.BytesIO()
-    np.save(out, arr)
+    out.write(arr.tobytes())
     out.seek(0)
     return sqlite3.Binary(out.read())
 
@@ -64,6 +66,15 @@ def create_mic(cur, exp_id, arr_id, mic_id, data, delay):
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating mic : %s' % s.message
+        raise s
+
+@with_cursor
+def get_mic_data(cur, exp_id, arr_id, mic_id):
+    try:
+        return cur.execute('SELECT data FROM mic WHERE experiment_id=:exp_id AND array_id=:arr_id AND mic_id=:mic_id',
+            {'exp_id': exp_id, 'arr_id': arr_id, 'mic_id': mic_id}).fetchone()
+    except sqlite3.IntegrityError as s:
+        print 'Error getting mic data : %s' % s.message
         raise s
 
 

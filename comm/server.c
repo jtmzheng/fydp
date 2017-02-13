@@ -8,7 +8,9 @@
 #include <netdb.h>
 #include "commUtils.h"
 
-#define SAMPLES_FILE "Clap1.json"
+// #define SAMPLES_FILE "Clap1.json"
+
+#define SAMPLES_FILE "samples.json"
 
 int is_valid_hex(char aHexChar)
 {

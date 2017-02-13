@@ -16,6 +16,7 @@ from multiprocessing import Pool
 from monitor import Monitor
 
 MAX_CHUNK_SIZE = 4096
+#DEFAULT_HOSTNAME = '192.168.7.2'
 DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
 
