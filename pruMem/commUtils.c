@@ -127,7 +127,7 @@ int get_request(comm_handle_t *pCommHandle)
         pCommHandle->mNewSocketFd = newsockfd;
         numberOutputSamples = ntohl(numberOutputSamples);
 
-        if (numberOutputSamples < 0)
+        if (numberOutputSamples <= 0)
         {
             numberOutputSamples = RING_BUFFER_SIZE;
         }

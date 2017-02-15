@@ -2,3 +2,5 @@ comm/client
 comm/server
 *.swp
 *.o
+*.pyc
+*.db

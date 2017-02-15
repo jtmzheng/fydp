@@ -4,13 +4,22 @@ import math
 import struct
 import time
 import getopt
-
 import errno
+import numpy as np
+
+import locate
+import db
+
 from socket import error as socket_error
+from multiprocessing import Pool
+
+from monitor import Monitor
 
 MAX_CHUNK_SIZE = 4096
+#DEFAULT_HOSTNAME = '192.168.7.2'
 DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
+
 
 def read_data(sock, nbytes):
     """Read nbytes of data from socket
@@ -26,12 +35,7 @@ def read_data(sock, nbytes):
         # NB: It actually doesn't really make a difference
         # if we decide to use socket.MSG_WAITALL...
         nbytes -= len(data)
-
-    output = []
-    for i in range(0, len(buf)):
-        c = struct.unpack('c', buf[i])
-        output.append(ord(c[0]))
-
+    output = np.fromstring(buf, dtype=np.uint8)
     return output
 
 def write_req(sock, nsamples):
@@ -50,14 +54,14 @@ def read_int(sock):
         return None
     return socket.ntohl(struct.unpack('I', raw)[0])
 
-def read_buffer(sock, nsamples):
+def read_buffer(sock, nsamples=0):
     """Read buffer with n samples of data from socket
     """
     write_req(sock, nsamples)
     nsamples = read_int(sock)
+    print 'Reading %d samples' % nsamples
     buf = read_data(sock, nsamples)
-    print str(buf)
-    return
+    return buf
 
 def connect(host, port):
     """Tries to connect until timeout (if specified)
@@ -82,8 +86,77 @@ def connect(host, port):
             time.sleep(1)
     return s
 
-def main(argv):
-    # Test data
+class BeagleReader:
+    """Reads data from Beaglebone
+    """
+    def __init__(self, host, port, x, y, samples=0):
+        """Given (host, port) Beaglebone is writing to
+        setup connection"""
+        self.host = host
+        self.port = port
+        self.x = x
+        self.y = y
+        self.samples = samples*3 # 3 readings from 3 mics per sample
+
+    def __call__(self):
+        return self.read()
+
+    def read(self):
+        """Read n samples from server (0 means all)
+        """
+        sock = connect(self.host, self.port)
+        buf = read_buffer(sock, self.samples)
+        assert(buf.shape[0] % 3 == 0)
+
+        data = buf.reshape((3, buf.shape[0]/3), order='F')
+        print 'Finished reading data from socket'
+        return data
+
+
+class MultiBeagleReader:
+    """Reads data from Beaglebones
+    """
+    def __init__(self, readers, x, y, timeout=10):
+        self.readers = readers
+        self.timeout = timeout
+        self.src_x = x
+        self.src_y = y
+
+    def read(self):
+        pool = Pool(processes=min(len(self.readers)+4, 4))
+        results = [pool.apply_async(reader, ()) for reader in self.readers]
+        bufs = [res.get(timeout=self.timeout) for res in results]
+
+        # NB: Write data to db, order of arrays/mics is arbitrary
+        exp_id = db.create_experiment(self.src_x, self.src_y)
+
+        for i in range(len(bufs)):
+            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
+            buf = bufs[i]
+
+            # Asynchronously calculate xcorr for each mic to baseline mic
+            results = []
+            for j in range(1, len(bufs[i])):
+                # For now use first signal as baseline (may have negative delay, which is fine)
+                results.append(pool.apply_async(locate.xcorr, args=(buf[0], buf[j])))
+
+            # NB: Quick and dirty way of getting just the delay out of (xcorr, delay) tuple
+            delays = [res.get(timeout=self.timeout)[1] for res in results]
+
+            # sqlite only supports synchronous updates
+            assert len(delays) == len(bufs[i]) - 1
+            mic_id = db.create_mic(exp_id, i, mic_id=0, data=buf[0], delay=0)
+            for j in range(1, len(bufs[i])):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j], delay=delays[j-1])
+
+        # Clean up
+        pool.close()
+        pool.join()
+        return bufs
+
+def run(argv):
+    """Main entry point of client
+    """
     portno = DEFAULT_PORT
     hostname = DEFAULT_HOSTNAME
 
@@ -103,10 +176,26 @@ def main(argv):
         print 'client.py -h <hostname> -p <port>'
         print 'Using default host localhost and default port 5555'
 
-    s = connect(hostname, portno)
-    buf = read_buffer(s, 10)
-    s.close()
-    return
 
-if __name__ == '__main__':
-    main(sys.argv[1:])
+    # Parse user input (TODO: Some sort of config file?)
+    print 'Enter sound source location:'
+    src_x = float(raw_input('x: '))
+    src_y = float(raw_input('y: '))
+    print 'Enter array 1 position:'
+    x1 = float(raw_input('x: '))
+    y1 = float(raw_input('y: '))
+
+    m = Monitor(3000)
+
+    # NB: For testing I ran a second local server on port 5556
+    # TODO: Use different hosts/ports
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, samples=0)
+    # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
+
+    # NB: We want the whatever reader/consumer to write out structured data
+    # to persistent storage (ie with metadata, raw data, analysis, etc)
+    mbr = MultiBeagleReader([br_1,], src_x, src_y)
+
+    m.add_callback('[MultiBeagleReader::read]', mbr.read)
+    m.monitor()
+    return
