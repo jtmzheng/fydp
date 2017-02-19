@@ -1,6 +1,10 @@
 # call this at the start of using the beaglebone, sets up the device tree, and calls source /.profile.
 cd ~
+
 source .profile
+
+export SLOTS=/sys/devices/bone_capemgr.9/slots
+export PINS=/sys/kernel/debug/pinctrl/44e10800.pinmux/pins
 
 cd /lib/firmware
 dtc -O dtb -o /lib/firmware/bspm_P8_45_2e-00A0.dtbo -b 0 -@ /lib/firmware/bspm_P8_45_2e-00A0.dts
