@@ -62,7 +62,7 @@ START:  // Initialization (Set up ADC, read some dummy samples, etc.)
         SBCO    r1, CONST_PRUSSINTC, SICR_OFFSET, 4     // Some command to clear the linux interrupt
 
         MOV     r1, 0x00000000  // Set r1 as the temporary dummy register containing data to send over
-        MOV     r2, 0x00000010 // Set r2 MAX Wait iterations
+        MOV     r2, 0x00000001 // Set r2 MAX Wait iterations MUST be at least 1 (Frequency = 1/((17 + 4*r2)*5e-9)
         MOV     r3, 0x00000000 // For waiting loop variable
         MOV     r4, 0x00000000 // For storing third microphone
 
@@ -129,9 +129,9 @@ SAMPLE_COLLECTION:              // NOTE, we collect samples out of the loop firs
 // Collection 0
         MOV     r9.b0, r31.b0
         MOV     r4.b0, r31.b1
-        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         set     r30, r30, MUX_ENCODE_PIN // increment to next MUX
         clr     r30,r30, ADC_CLK_PIN
+        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         NOP
         NOP
         MOV     r3, r2
@@ -141,11 +141,11 @@ Wait_r9b0:
 
         MOV     r9.b1, r31.b0
         MOV     r4.b1, r31.b1
+        clr     r30, r30, MUX_ENCODE_PIN
+        set     r30,r30, ADC_CLK_PIN
         LSL     r4.b1, r4.b1, 4     // Left Shift Mic3 MSB
         AND     r4.b1, r4.b1, 0x0F0 // Clear Mic3 MSBs
         OR      r9.b2, r4.b0, r4.b1 // Combine MSB and LSB
-        clr     r30, r30, MUX_ENCODE_PIN
-        set     r30,r30, ADC_CLK_PIN
         NOP
         MOV     r3, r2
 Wait_r9b1:
@@ -156,9 +156,9 @@ MAINLOOP: // The NOP operations are to ensure that we always sample at a consist
 // Collection 1
         MOV     r9.b3, r31.b0
         MOV     r4.b0, r31.b1
-        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         set     r30, r30, MUX_ENCODE_PIN // increment to next MUX
         clr     r30,r30, ADC_CLK_PIN
+        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         NOP
         NOP
         MOV     r3, r2
@@ -168,11 +168,11 @@ Wait_r9b3:
 
         MOV     r10.b0, r31.b0
         MOV     r4.b1, r31.b1
+        clr     r30, r30, MUX_ENCODE_PIN
+        set     r30,r30, ADC_CLK_PIN
         LSL     r4.b1, r4.b1, 4     // Left Shift Mic3 MSB
         AND     r4.b1, r4.b1, 0xF0 // Clear Mic3 MSBs
         OR      r10.b1, r4.b0, r4.b1 // Combine MSB and LSB
-        clr     r30, r30, MUX_ENCODE_PIN
-        set     r30,r30, ADC_CLK_PIN
         NOP
         MOV     r3, r2
 Wait_r10b0:
@@ -182,9 +182,9 @@ Wait_r10b0:
 // Collection 2
         MOV     r10.b2, r31.b0
         MOV     r4.b0, r31.b1
-        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         set     r30, r30, MUX_ENCODE_PIN // increment to next MUX
         clr     r30,r30, ADC_CLK_PIN
+        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         NOP
         NOP
         MOV     r3, r2
@@ -194,11 +194,11 @@ Wait_r10b2:
 
         MOV     r10.b3, r31.b0
         MOV     r4.b1, r31.b1
+        clr     r30, r30, MUX_ENCODE_PIN
+        set     r30,r30, ADC_CLK_PIN
         LSL     r4.b1, r4.b1, 4     // Left Shift Mic3 MSB
         AND     r4.b1, r4.b1, 0xF0 // Clear Mic3 MSBs
         OR      r11.b0, r4.b0, r4.b1 // Combine MSB and LSB
-        clr     r30, r30, MUX_ENCODE_PIN
-        set     r30,r30, ADC_CLK_PIN
         NOP
         MOV     r3, r2
 Wait_r10b3:
@@ -208,9 +208,9 @@ Wait_r10b3:
 // Collection 3
         MOV     r11.b1, r31.b0
         MOV     r4.b0, r31.b1
-        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         set     r30, r30, MUX_ENCODE_PIN // increment to next MUX
         clr     r30,r30, ADC_CLK_PIN
+        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         NOP
         NOP
         MOV     r3, r2
@@ -220,11 +220,11 @@ Wait_r11b1:
 
         MOV     r11.b2, r31.b0
         MOV     r4.b1, r31.b1
+        clr     r30, r30, MUX_ENCODE_PIN
+        set     r30,r30, ADC_CLK_PIN
         LSL     r4.b1, r4.b1, 4     // Left Shift Mic3 MSB
         AND     r4.b1, r4.b1, 0xF0 // Clear Mic3 MSBs
         OR      r11.b3, r4.b0, r4.b1 // Combine MSB and LSB
-        clr     r30, r30, MUX_ENCODE_PIN
-        set     r30,r30, ADC_CLK_PIN
         XOUT    XFR_BANK, r9, NUM_DATA_BYTES    // Move all samples to Bank0
         MOV     r3, r2
 Wait_r11b2:
@@ -236,9 +236,9 @@ Wait_r11b2:
 // Collection 4
         MOV     r9.b0, r31.b0
         MOV     r4.b0, r31.b1
-        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         set     r30, r30, MUX_ENCODE_PIN // increment to next MUX
         clr     r30,r30, ADC_CLK_PIN
+        AND     r4.b0, r4.b0, 0x0F  // Clear Mic3 LSBs
         XOUT    XFR_BANK, r7, NUM_COMM_BYTES    // Inform PRU_MEM new data is available
         NOP
         MOV     r3, r2
@@ -248,13 +248,12 @@ Wait_r9b0a:
 
         MOV     r9.b1, r31.b0
         MOV     r4.b1, r31.b1
+        clr     r30, r30, MUX_ENCODE_PIN
+        set     r30,r30, ADC_CLK_PIN
         LSL     r4.b1, r4.b1, 4     // Left Shift Mic3 MSB
         AND     r4.b1, r4.b1, 0xF0 // Clear Mic3 MSBs
         OR      r9.b2, r4.b0, r4.b1 // Combine MSB and LSB
-        clr     r30, r30, MUX_ENCODE_PIN
-        set     r30,r30, ADC_CLK_PIN
-        NOP
-        MOV     r3, r2
+        MOV     r3, r2 // No NOP here because QBBC
 Wait_r9b1a:
         SUB     r3, r3, 1
         QBNE    Wait_r9b1a, r3, 0
