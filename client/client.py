@@ -20,6 +20,13 @@ MAX_CHUNK_SIZE = 4096
 DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
 
+# Maps angle from microphone local coordinates to array coordinates (rotation to mic 0 axis)
+ANGLE_OFFSET = {
+    0: 0,
+    1: 2.0944, # 120 deg in rad
+    2: 4.18879, # 240 deg in rad
+}
+
 
 def read_data(sock, nbytes):
     """Read nbytes of data from socket
@@ -136,22 +143,42 @@ class MultiBeagleReader:
 
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
-            for j in range(1, len(bufs[i])):
-                # For now use first signal as baseline (may have negative delay, which is fine)
-                results.append(pool.apply_async(locate.xcorr, args=(buf[0], buf[j])))
+            for j in range(len(buf)):
+                for k in range(j, len(buf)):
+                    if j != k:
+                        # Map (j, k) microphone pair to xcorr task
+                        results.append((
+                            (j, k), pool.apply_async(locate.xcorr, args=(buf[j], buf[k]))
+                        ))
 
-            # NB: Quick and dirty way of getting just the delay out of (xcorr, delay) tuple
-            delays = [res.get(timeout=self.timeout)[1] for res in results]
+            # 3x3 array delays[i][j] is the delay of signal j relative to signal i
+            delays = np.zeros((len(buf), len(buf)), dtype=np.float)
+            for res in results:
+                key, val = res[0], res[1]
+                delays[key[0]][key[1]] = val.get(timeout=self.timeout)[1] # xcorr (val, delay) tuple
+                delays[key[1]][key[0]] = -delays[key[0]][key[1]]
+
+            print delays
+            assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
             # sqlite only supports synchronous updates
-            assert len(delays) == len(bufs[i]) - 1
-            mic_id = db.create_mic(exp_id, i, mic_id=0, data=buf[0], delay=0)
-            for j in range(1, len(bufs[i])):
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j], delay=delays[j-1])
+            for j in range(len(buf)):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # Estimate "location" of sound source, create array record
-            r, theta = locate.locate(delays[0], delays[1], self.readers[i].l)
-            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y, r, theta)
+            for j in range(len(buf)):
+                if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
+                    print 'Using microphone %d as closest mic' % j
+                    r, theta = locate.locate(delays[j][(j+1)%3], delays[j][(j+2)%3], self.readers[i].l)
+                    arr_id = db.create_array(
+                        exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
+                    )
+                    break
+
+            # Write each mic pair to db (NB: Redundant data but small size so okay)
+            for j in range(len(buf)):
+                for k in range(len(buf)):
+                    db.create_mic_pair(exp_id, i, j, k, delays[j][k])
 
         # Clean up
         pool.close()

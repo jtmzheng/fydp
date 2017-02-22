@@ -59,14 +59,25 @@ def create_array(cur, exp_id, arr_id, x, y, r, theta):
         raise s
 
 @with_cursor
-def create_mic(cur, exp_id, arr_id, mic_id, data, delay):
+def create_mic(cur, exp_id, arr_id, mic_id, data):
     try:
-        cur.execute('INSERT INTO mic VALUES(:exp_id, :arr_id, :mic_id, :data, :delay)',
-            {'exp_id': exp_id, 'arr_id': arr_id, 'mic_id': mic_id, 'data': data, 'delay': delay})
+        cur.execute('INSERT INTO mic VALUES(:exp_id, :arr_id, :mic_id, :data)',
+            {'exp_id': exp_id, 'arr_id': arr_id, 'mic_id': mic_id, 'data': data})
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating mic : %s' % s.message
         raise s
+
+@with_cursor
+def create_mic_pair(cur, exp_id, arr_id, mic_1, mic_2, delay):
+    try:
+        cur.execute('INSERT INTO mic_pair VALUES(:exp_id, :arr_id, :mic_1, :mic_2, :delay)',
+            {'exp_id': exp_id, 'arr_id': arr_id, 'mic_1': mic_1, 'mic_2': mic_2, 'delay': delay})
+        return cur.lastrowid
+    except sqlite3.IntegrityError as s:
+        print 'Error creating mic pair (%d, %d): %s' % (mic_1, mic_2, s.message)
+        raise s
+
 
 @with_cursor
 def get_mic_data(cur, exp_id, arr_id, mic_id):
