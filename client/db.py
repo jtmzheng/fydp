@@ -49,10 +49,10 @@ def create_experiment(cur, src_x, src_y):
         raise s
 
 @with_cursor
-def create_array(cur, exp_id, arr_id, x, y):
+def create_array(cur, exp_id, arr_id, x, y, r, theta):
     try:
-        cur.execute('INSERT INTO array VALUES(:exp_id, :arr_id, :x, :y)',
-            {'exp_id': exp_id, 'arr_id': arr_id, 'x': x, 'y': y})
+        cur.execute('INSERT INTO array VALUES(:exp_id, :arr_id, :x, :y, :r, :theta)',
+            {'exp_id': exp_id, 'arr_id': arr_id, 'x': x, 'y': y, 'r': r, 'theta': theta})
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating array: %s' % s.message

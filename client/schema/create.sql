@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS array (
     array_id      INTEGER,
     x             REAL,
     y             REAL,
+
+    /* Polar position estimate of sound source (NB: r is typically very bad) */
+    r             REAL,
+    theta         REAL,
     PRIMARY KEY   (experiment_id, array_id)
 );
 

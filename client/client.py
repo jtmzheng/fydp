@@ -89,13 +89,14 @@ def connect(host, port):
 class BeagleReader:
     """Reads data from Beaglebone
     """
-    def __init__(self, host, port, x, y, samples=0):
+    def __init__(self, host, port, x, y, l, samples=0):
         """Given (host, port) Beaglebone is writing to
         setup connection"""
         self.host = host
         self.port = port
         self.x = x
         self.y = y
+        self.l = l
         self.samples = samples*3 # 3 readings from 3 mics per sample
 
     def __call__(self):
@@ -131,7 +132,6 @@ class MultiBeagleReader:
         exp_id = db.create_experiment(self.src_x, self.src_y)
 
         for i in range(len(bufs)):
-            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y)
             buf = bufs[i]
 
             # Asynchronously calculate xcorr for each mic to baseline mic
@@ -148,6 +148,10 @@ class MultiBeagleReader:
             mic_id = db.create_mic(exp_id, i, mic_id=0, data=buf[0], delay=0)
             for j in range(1, len(bufs[i])):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j], delay=delays[j-1])
+
+            # Estimate "location" of sound source, create array record
+            r, theta = locate.locate(delays[0], delays[1], self.readers[i].l)
+            arr_id = db.create_array(exp_id, i, self.readers[i].x, self.readers[i].y, r, theta)
 
         # Clean up
         pool.close()
@@ -184,12 +188,14 @@ def run(argv):
     print 'Enter array 1 position:'
     x1 = float(raw_input('x: '))
     y1 = float(raw_input('y: '))
+    print 'Enter array length:'
+    l1 = float(raw_input('l: '))
 
     m = Monitor(3000)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
-    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, samples=0)
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
     # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
 
     # NB: We want the whatever reader/consumer to write out structured data
