@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
     size_t data_size = read_file_value(MMAP_LOC "size");
     size_t numberOutputSamples = RING_BUFFER_SIZE;
     int ret;
-
+    
     if(argc>1){     // There is an argument -- lists number of samples to dump
                     // this defaults to the total DDR Memory Pool x 2 (16-bit samples) 
         numberOutputSamples = atoi(argv[1]);
@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
 
     if (ret == 0)
     {
+        puts("Content-type: application/json\n");
         printf("{\"NumSamples\": %d,\n", numberOutputSamples);
         
         printf("\"Data\":\"0x");
