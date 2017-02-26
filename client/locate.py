@@ -17,19 +17,12 @@ WINDOW_SIZE = 5000
 
 # Butterworth filter (manually calibrated) parameters
 FREQ_1 = 250 #Hz
-FREQ_2 = 350 #Hz
-
-# Windowing for GCC-PHAT weighting function
-F_MIN = 50  #Hz
-F_MAX = 500 #Hz
+FREQ_2 = 300 #Hz
 
 # Number of peaks we want to window signal over
 N_PEAKS = 10
 PEAK_WINDOW_PREFIX = 3*36000
 PEAK_WINDOW_SUFFIX = 36000
-
-# Max delay given input (FIXME: Calculate from l)
-MAX_DELAY = 18000
 
 def apply_butter(f1, f2, fs, sig):
     """ Apply second order Butterworth filter to sig
@@ -107,18 +100,17 @@ def find_peak_window(sig, thres, min_dist, n):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
     # Butterworth filter (easier to get peaks)
-    sig_crop = np.array(sig)
     sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
 
     # Find indexes for first N peaks over threshold
-    idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
+    idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=N_PEAKS)
 
     # Window the signal
-    sig_butter[:(idx[0]-PEAK_WINDOW_PREFIX)] = 0
-    sig_butter[(idx[-1]+PEAK_WINDOW_SUFFIX):] = 0
-    sig_crop[:(idx[0]-PEAK_WINDOW_PREFIX)] = 0
-    sig_crop[(idx[-1]+PEAK_WINDOW_SUFFIX):] = 0
-    return sig_crop, sig_butter
+    sig_butter[:idx[0]-PEAK_WINDOW_PREFIX] = 0
+    sig_butter[idx[-1]+PEAK_WINDOW_SUFFIX:] = 0
+    sig[:idx[0]-PEAK_WINDOW_PREFIX] = 0
+    sig[idx[-1]+PEAK_WINDOW_SUFFIX:] = 0
+    return sig, sig_butter
 
 def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
@@ -137,7 +129,7 @@ def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     sig2_cropped, _ = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
 
     # Compute xcorr of the cropped signals
-    return gcc_xcorr(sig1_cropped, sig2_cropped, F_MIN, F_MAX, SAMPLING_FREQ)
+    return xcorr(sig1_cropped, sig2_cropped)
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
@@ -160,37 +152,6 @@ def xcorr(sig1, sig2):
     # Negative `ind` since we want how much sig2 should be shifted to maximize correlation with sig1
     return max_corr, -ind
 
-def next_pow_2(n):
-    """ Much faster to fft at next pow of 2
-    """
-    return np.power(2, np.ceil(np.log2(n)))
-
-def gcc_xcorr(sig1, sig2, fmin, fmax, fs):
-    """ GCC-PHAT windowed on [fmin, fmax]
-    """
-    Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
-
-    SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
-    SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=Nfft, d=1./fs))
-
-    CORR = np.multiply(SIG1, np.conj(SIG2))
-    CORR[np.where(np.abs(freq) < fmin)] = 0 # window in frequency domain
-    CORR[np.where(np.abs(freq) > fmax)] = 0
-
-    CORR = CORR / (np.abs(SIG1) * np.abs(np.conj(SIG2)))
-    corr = np.fft.ifft(np.fft.ifftshift(CORR))
-    corr = np.fft.fftshift(corr)
-
-    # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within
-    # physically possible limits
-    samples = np.arange(len(corr))
-    samples -= len(samples)/2
-    corr[np.where(np.abs(samples) > MAX_DELAY)] = 0
-
-    ind = np.argmax(corr)
-    delay = -samples[ind]
-    return corr, delay
 
 if __name__ == '__main__':
     # Test position
