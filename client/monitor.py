@@ -1,6 +1,9 @@
 from sys import byteorder
 from array import array
 from numpy import mean, sqrt, square
+from scipy import signal
+import numpy as np
+import scipy as sp
 
 import pyaudio
 import time
@@ -18,6 +21,7 @@ class Monitor:
         self.callbacks = {}
         self.threshold = threshold
         self.run_count = run_count
+        self.max_val = 0
 
     def add_callback(self, name, cb):
         """Add a callback to respond to triggers from monitor
@@ -31,19 +35,32 @@ class Monitor:
         """
         del self.callbacks[name]
 
-    def is_silent(self, snd_data):
+    def is_silent(self, snd_data, sos_filter):
         """Returns true if below the 'silent' threshold
         """
-        sound_rms = sqrt(mean(square(snd_data)))
-        print("RMS: %d\n" % sound_rms)
+        if sos_filter is not None:
+            sound_rms = sqrt(mean(square(signal.sosfiltfilt(sos_filter, np.array(snd_data)))))
+        else:
+            sound_rms = sqrt(mean(square(snd_data)))
+
+
+        self.max_val = max(self.max_val, sound_rms)
+        print("RMS: %d, prev_max: %d\n" % (sound_rms, self.max_val))
         return sound_rms < self.threshold
 
-    def monitor(self):
+    def monitor(self, freq=np.array([200, 350])):
         """Start monitoring loop
         NB: We close the old audio stream and create a new one each time
         we capture noise to ensure we don't process stale data that was
         left in the old stream
         """
+
+        if freq is not None:
+            sos_filter = sp.signal.butter(2, (freq / (float(RATE) / 2)),
+                            btype='bandpass', analog=False, output='sos')
+        else:
+            sos_filter = None
+
         p = pyaudio.PyAudio()
         while self.run_count > 0:
             self.run_count -= 1
@@ -59,9 +76,10 @@ class Monitor:
                 if byteorder == 'big':
                     snd_data.byteswap()
 
-                silent = self.is_silent(snd_data)
+                silent = self.is_silent(snd_data, sos_filter)
 
             stream.stop_stream()
+            self.max_val = 0
             for cb in self.callbacks.values():
                 print 'Calling monitor callback...'
                 ret = cb()
@@ -77,10 +95,11 @@ def tmp_callback():
     print ("Callback!\n")
     time.sleep(1)
     print ("Resuming!\n")
+    return []
 
 if __name__ == '__main__':
     print("Starting Monitoring System!\n")
-    monitor = Monitor(10000)
+    monitor = Monitor(350)
     monitor.add_callback('tmp_callback', tmp_callback)
     monitor.monitor()
     monitor.remove_callback('tmp_callback')
