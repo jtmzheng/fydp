@@ -17,11 +17,17 @@ class Monitor:
     """Monitor class for monitoring audio signals and triggering
     functionality based on triggers
     """
-    def __init__(self, threshold, run_count=1):
+    def __init__(self, threshold, run_count=1, freq=np.array([200, 350])):
         self.callbacks = {}
         self.threshold = threshold
         self.run_count = run_count
         self.max_val = 0
+
+        if freq is not None:
+            self.sos_filter = sp.signal.butter(2, (freq / (float(RATE) / 2)),
+                            btype='bandpass', analog=False, output='sos')
+        else:
+            self.sos_filter = None
 
     def add_callback(self, name, cb):
         """Add a callback to respond to triggers from monitor
@@ -35,11 +41,11 @@ class Monitor:
         """
         del self.callbacks[name]
 
-    def is_silent(self, snd_data, sos_filter):
+    def is_silent(self, snd_data):
         """Returns true if below the 'silent' threshold
         """
-        if sos_filter is not None:
-            sound_rms = sqrt(mean(square(signal.sosfiltfilt(sos_filter, np.array(snd_data)))))
+        if self.sos_filter is not None:
+            sound_rms = sqrt(mean(square(signal.sosfiltfilt(self.sos_filter, np.array(snd_data)))))
         else:
             sound_rms = sqrt(mean(square(snd_data)))
 
@@ -48,18 +54,12 @@ class Monitor:
         print("RMS: %d, prev_max: %d\n" % (sound_rms, self.max_val))
         return sound_rms < self.threshold
 
-    def monitor(self, freq=np.array([200, 350])):
+    def monitor(self):
         """Start monitoring loop
         NB: We close the old audio stream and create a new one each time
         we capture noise to ensure we don't process stale data that was
         left in the old stream
         """
-
-        if freq is not None:
-            sos_filter = sp.signal.butter(2, (freq / (float(RATE) / 2)),
-                            btype='bandpass', analog=False, output='sos')
-        else:
-            sos_filter = None
 
         p = pyaudio.PyAudio()
         while self.run_count > 0:
@@ -76,7 +76,7 @@ class Monitor:
                 if byteorder == 'big':
                     snd_data.byteswap()
 
-                silent = self.is_silent(snd_data, sos_filter)
+                silent = self.is_silent(snd_data)
 
             stream.stop_stream()
             self.max_val = 0
