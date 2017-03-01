@@ -17,14 +17,14 @@ class Monitor:
     """Monitor class for monitoring audio signals and triggering
     functionality based on triggers
     """
-    def __init__(self, threshold, run_count=1, freq=np.array([200, 350])):
+    def __init__(self, threshold, run_count=1, freq=(200, 350)):
         self.callbacks = {}
         self.threshold = threshold
         self.run_count = run_count
         self.max_val = 0
 
         if freq is not None:
-            self.sos_filter = sp.signal.butter(2, (freq / (float(RATE) / 2)),
+            self.sos_filter = sp.signal.butter(2, (np.array(freq) / (float(RATE) / 2)),
                             btype='bandpass', analog=False, output='sos')
         else:
             self.sos_filter = None
