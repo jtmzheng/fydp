@@ -124,7 +124,7 @@ class BeagleReader:
 class MultiBeagleReader:
     """Reads data from Beaglebones
     """
-    def __init__(self, readers, x, y, timeout=10):
+    def __init__(self, readers, x, y, timeout=100):
         self.readers = readers
         self.timeout = timeout
         self.src_x = x
@@ -218,7 +218,7 @@ def run(argv):
     print 'Enter array length:'
     l1 = float(raw_input('l: '))
 
-    m = Monitor(3000)
+    m = Monitor(1500)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports

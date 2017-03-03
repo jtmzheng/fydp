@@ -79,6 +79,7 @@ class Monitor:
                 silent = self.is_silent(snd_data)
 
             stream.stop_stream()
+            time.sleep(0.01)
             self.max_val = 0
             for cb in self.callbacks.values():
                 print 'Calling monitor callback...'
