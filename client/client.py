@@ -148,7 +148,7 @@ class MultiBeagleReader:
                     if j != k:
                         # Map (j, k) microphone pair to xcorr task
                         results.append((
-                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k]))
+                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k], self.readers[i].l))
                         ))
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
