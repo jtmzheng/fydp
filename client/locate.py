@@ -203,16 +203,14 @@ def gcc_xcorr(sig1, sig2, max_delay, fmin, fmax, fs):
     corr = np.fft.ifft(np.fft.ifftshift(CORR))
     corr = np.fft.fftshift(corr)
 
-    ind = np.argmax(corr)
-
-    samples = np.arange(len(corr)) - len(corr)/2
-    delay = -samples[ind]
-
     # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within
     # physically possible limits
     samples = np.arange(len(corr))
     samples -= len(samples)/2
     corr[np.where(np.abs(samples) > max_delay)] = 0
+
+    ind = np.argmax(corr)
+    delay = -samples[ind]
 
     return corr, delay
 
