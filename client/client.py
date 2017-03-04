@@ -8,6 +8,7 @@ import errno
 import numpy as np
 
 import locate
+import farwave
 import db
 
 from socket import error as socket_error
@@ -148,8 +149,12 @@ class MultiBeagleReader:
                     if j != k:
                         # Map (j, k) microphone pair to xcorr task
                         results.append((
-                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k]))
+                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k], self.readers[i].l))
                         ))
+
+            # sqlite only supports synchronous updates
+            for j in range(len(buf)):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
             delays = np.zeros((len(buf), len(buf)), dtype=np.float)
@@ -161,9 +166,8 @@ class MultiBeagleReader:
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
-            # sqlite only supports synchronous updates
-            for j in range(len(buf)):
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
+            farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
+            print("Far Wave Angle: %r\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
@@ -218,7 +222,7 @@ def run(argv):
     print 'Enter array length:'
     l1 = float(raw_input('l: '))
 
-    m = Monitor(1500)
+    m = Monitor(300)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
