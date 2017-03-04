@@ -60,7 +60,6 @@ lsmod
 rmmod uio_pruss
 modprobe uio_pruss extram_pool_sz=0x800000
 
-cd ~/pruData
 pasm -V3b pruADC3.p
 pasm -V3b pruMem.p
 gcc dumpSamples.c dataBuffer.c -o dumpSamples
