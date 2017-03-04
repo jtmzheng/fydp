@@ -8,7 +8,7 @@ from scipy import signal
 import math
 import peakutils
 
-SPEED_SOUND = 300.0 # [m]
+SPEED_SOUND = 340.0 # [m/s]
 SAMPLING_FREQ = 9.5e6 # [Hz]
 
 # Max filter window size
@@ -130,7 +130,7 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
 
-def xcorr_peaks(sig1, sig2, n=N_PEAKS):
+def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
@@ -147,8 +147,9 @@ def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.3, min_dist=1000,
                                                            n=None, closest_to=pk1_locs)
 
+    max_delay = l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
     # Compute xcorr of the cropped signals
-    max_corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, 200, 350, SAMPLING_FREQ)
+    max_corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, FREQ_1, FREQ_2, SAMPLING_FREQ)
     return max_corr, (delay + (offset2 - offset1))
 
 def xcorr(sig1, sig2):
@@ -177,7 +178,7 @@ def next_pow_2(n):
     """
     return np.power(2, np.ceil(np.log2(n)))
 
-def gcc_xcorr(sig1, sig2, fmin, fmax, fs):
+def gcc_xcorr(sig1, sig2, max_delay, fmin, fmax, fs):
     """ GCC-PHAT windowed on [fmin, fmax]
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
@@ -200,8 +201,13 @@ def gcc_xcorr(sig1, sig2, fmin, fmax, fs):
     samples = np.arange(len(corr)) - len(corr)/2
     delay = -samples[ind]
 
-    print delay
-    return corr[ind], delay
+    # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within
+    # physically possible limits
+    samples = np.arange(len(corr))
+    samples -= len(samples)/2
+    corr[np.where(np.abs(samples) > max_delay)] = 0
+
+    return corr, delay
 
 if __name__ == '__main__':
     # Test position
