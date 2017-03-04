@@ -130,6 +130,11 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
 
+def calc_max_delay(l):
+    """ Compute the max delay possible given microphone center distance l
+    """
+    return l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
+
 def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
@@ -147,7 +152,7 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.3, min_dist=1000,
                                                            n=None, closest_to=pk1_locs)
 
-    max_delay = l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
+    max_delay = calc_max_delay(l)
     # Compute xcorr of the cropped signals
     max_corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, FREQ_1, FREQ_2, SAMPLING_FREQ)
     return max_corr, (delay + (offset2 - offset1))

@@ -8,6 +8,7 @@ import errno
 import numpy as np
 
 import locate
+import farwave
 import db
 
 from socket import error as socket_error
@@ -160,6 +161,9 @@ class MultiBeagleReader:
 
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
+
+            farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
+            print("Far Wave Angle: %r\n" % farwave_ang)
 
             # sqlite only supports synchronous updates
             for j in range(len(buf)):
