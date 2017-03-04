@@ -39,10 +39,10 @@ def with_cursor(func):
     return query
 
 @with_cursor
-def create_experiment(cur, src_x, src_y):
+def create_experiment(cur, src_x, src_y, comment):
     try:
-        cur.execute('INSERT INTO experiment(datetime, x, y) VALUES (:datetime, :x, :y)',
-            {'datetime': int(time.time()), 'x': src_x, 'y': src_y})
+        cur.execute('INSERT INTO experiment(datetime, x, y, comment) VALUES (:datetime, :x, :y, :comment)',
+            {'datetime': int(time.time()), 'x': src_x, 'y': src_y, 'comment': comment})
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating experiment: %s' % s.message
@@ -90,7 +90,7 @@ def get_mic_data(cur, exp_id, arr_id, mic_id):
 
 
 if __name__ == '__main__':
-    exp_id = create_experiment()
+    exp_id = create_experiment(1, 1, 'No comment')
     print 'Experiment ID: %s' % str(exp_id)
     array = create_array(exp_id, 1, 0.1, 0.2)
     print 'Array ID: %s' % str(array)
