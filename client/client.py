@@ -124,11 +124,12 @@ class BeagleReader:
 class MultiBeagleReader:
     """Reads data from Beaglebones
     """
-    def __init__(self, readers, x, y, timeout=100):
+    def __init__(self, readers, x, y, timeout=100, comment=''):
         self.readers = readers
         self.timeout = timeout
         self.src_x = x
         self.src_y = y
+        self.comment = comment
 
     def read(self):
         pool = Pool(processes=min(len(self.readers)+4, 4))
@@ -136,7 +137,7 @@ class MultiBeagleReader:
         bufs = [res.get(timeout=self.timeout) for res in results]
 
         # NB: Write data to db, order of arrays/mics is arbitrary
-        exp_id = db.create_experiment(self.src_x, self.src_y)
+        exp_id = db.create_experiment(self.src_x, self.src_y, self.comment)
 
         for i in range(len(bufs)):
             buf = bufs[i]
@@ -217,8 +218,12 @@ def run(argv):
     y1 = float(raw_input('y: '))
     print 'Enter array length:'
     l1 = float(raw_input('l: '))
+    print 'Enter number of runs (Default 1)'
+    runs = int((raw_input('Runs: ') or '1'))
+    print 'Enter experiment descriptor (Optional)'
+    comment = raw_input('Comment: ') or ''
 
-    m = Monitor(1500)
+    m = Monitor(1500, runs)
 
     # NB: For testing I ran a second local server on port 5556
     # TODO: Use different hosts/ports
@@ -227,7 +232,7 @@ def run(argv):
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
-    mbr = MultiBeagleReader([br_1,], src_x, src_y)
+    mbr = MultiBeagleReader([br_1,], src_x, src_y, 100, comment)
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()
