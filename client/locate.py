@@ -9,18 +9,18 @@ import math
 import peakutils
 
 SPEED_SOUND = 300.0 # [m]
-SAMPLING_FREQ = 9.6e6 # [Hz]
+SAMPLING_FREQ = 9.5e6 # [Hz]
 
 # Max filter window size
 MED_WINDOW_SIZE = 21
 WINDOW_SIZE = 5000
 
 # Butterworth filter (manually calibrated) parameters
-FREQ_1 = 250 #Hz
-FREQ_2 = 300 #Hz
+FREQ_1 = 200 #Hz
+FREQ_2 = 350 #Hz
 
 # Number of peaks we want to window signal over
-N_PEAKS = 10
+N_PEAKS = 5
 PEAK_WINDOW_PREFIX = 3*36000
 PEAK_WINDOW_SUFFIX = 36000
 
@@ -57,6 +57,10 @@ def mov_median(seq, window=1):
     """
     #assert len(seq) >= window
     return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).median().values.T[0]
+
+def find_nearest(array,value):
+    idx = (np.abs(array-value)).argmin()
+    return array[idx]
 
 def calc_rel_delay(r, theta, l):
     """Generate ideal relative delay (f1, f2) given (r, theta) and l
@@ -102,22 +106,29 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     r_hat, theta_hat = fsolve(func, [r0, theta0])
     return r_hat, theta_hat
 
-def find_peak_window(sig, thres, min_dist, n):
+def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
     # Butterworth filter (easier to get peaks)
     sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
 
-    # Find indexes for first N peaks over threshold
-    idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=N_PEAKS)
+    idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
 
     # Window the signal
-    offset_low = (idx[0]-PEAK_WINDOW_PREFIX)
-    offset_high = (idx[-1]+PEAK_WINDOW_SUFFIX)
-    
+    if closest_to is None:
+        # Find indexes for first N peaks over threshold
+        offset_low = (idx[0]-PEAK_WINDOW_PREFIX)
+        offset_high = (idx[-1]+PEAK_WINDOW_SUFFIX)
+        pk_locs = (idx[0], idx[-1])
+
+    else:
+        pk_locs = (find_nearest(idx,closest_to[0]), find_nearest(idx,closest_to[1]))
+        offset_low = (pk_locs[0]-PEAK_WINDOW_PREFIX)
+        offset_high = (pk_locs[-1]+PEAK_WINDOW_SUFFIX)
+
     sig_butter = sig_butter[offset_low:offset_high]
     sig = sig[offset_low:offset_high]
-    return sig, sig_butter, offset_low
+    return sig, sig_butter, offset_low, pk_locs
 
 def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
@@ -132,11 +143,13 @@ def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     sig2 = sig2 - np.mean(sig2)
 
     # Crop each signal about peaks
-    sig1_cropped, _ , offset1 = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
-    sig2_cropped, _ , offset2 = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
+    sig1_cropped, _ , offset1, pk1_locs = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
+    sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.3, min_dist=1000,
+                                                           n=None, closest_to=pk1_locs)
 
     # Compute xcorr of the cropped signals
-    return xcorr(sig1_cropped, sig2_cropped) + (offset2 - offset1)
+    max_corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, 200, 350, SAMPLING_FREQ)
+    return max_corr, (delay + (offset2 - offset1))
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
@@ -159,6 +172,36 @@ def xcorr(sig1, sig2):
     # Negative `ind` since we want how much sig2 should be shifted to maximize correlation with sig1
     return max_corr, -ind
 
+def next_pow_2(n):
+    """ Much faster to fft at next pow of 2
+    """
+    return np.power(2, np.ceil(np.log2(n)))
+
+def gcc_xcorr(sig1, sig2, fmin, fmax, fs):
+    """ GCC-PHAT windowed on [fmin, fmax]
+    """
+    Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
+    # print Nfft, np.log2(Nfft)
+
+    SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
+    SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
+    freq = np.fft.fftshift(np.fft.fftfreq(n=Nfft, d=1./fs))
+
+    CORR = np.multiply(SIG1, np.conj(SIG2))
+    CORR[np.where(np.abs(freq) < fmin)] = 0 # window in frequency domain
+    CORR[np.where(np.abs(freq) > fmax)] = 0
+
+    CORR = CORR / (np.abs(SIG1) * np.abs(np.conj(SIG2)))
+    corr = np.fft.ifft(np.fft.ifftshift(CORR))
+    corr = np.fft.fftshift(corr)
+
+    ind = np.argmax(corr)
+
+    samples = np.arange(len(corr)) - len(corr)/2
+    delay = -samples[ind]
+
+    print delay
+    return corr[ind], delay
 
 if __name__ == '__main__':
     # Test position
