@@ -52,6 +52,12 @@ def movmax(seq, window=1):
     #assert len(seq) >= window
     return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).max().values.T[0]
 
+def mov_median(seq, window=1):
+    """Moving windowed median over seq of input window size
+    """
+    #assert len(seq) >= window
+    return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).median().values.T[0]
+
 def calc_rel_delay(r, theta, l):
     """Generate ideal relative delay (f1, f2) given (r, theta) and l
     """
@@ -106,30 +112,31 @@ def find_peak_window(sig, thres, min_dist, n):
     idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=N_PEAKS)
 
     # Window the signal
-    sig_butter[:idx[0]-PEAK_WINDOW_PREFIX] = 0
-    sig_butter[idx[-1]+PEAK_WINDOW_SUFFIX:] = 0
-    sig[:idx[0]-PEAK_WINDOW_PREFIX] = 0
-    sig[idx[-1]+PEAK_WINDOW_SUFFIX:] = 0
-    return sig, sig_butter
+    offset_low = (idx[0]-PEAK_WINDOW_PREFIX)
+    offset_high = (idx[-1]+PEAK_WINDOW_SUFFIX)
+    
+    sig_butter = sig_butter[offset_low:offset_high]
+    sig = sig[offset_low:offset_high]
+    return sig, sig_butter, offset_low
 
 def xcorr_peaks(sig1, sig2, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
     # Median filter both signals
-    sig1 = signal.medfilt(sig1, MED_WINDOW_SIZE)
-    sig2 = signal.medfilt(sig2, MED_WINDOW_SIZE)
+    sig1 = mov_median(sig1, MED_WINDOW_SIZE)
+    sig2 = mov_median(sig2, MED_WINDOW_SIZE)
 
     # Zero mean
     sig1 = sig1 - np.mean(sig1)
     sig2 = sig2 - np.mean(sig2)
 
     # Crop each signal about peaks
-    sig1_cropped, _ = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
-    sig2_cropped, _ = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
+    sig1_cropped, _ , offset1 = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
+    sig2_cropped, _ , offset2 = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
 
     # Compute xcorr of the cropped signals
-    return xcorr(sig1_cropped, sig2_cropped)
+    return xcorr(sig1_cropped, sig2_cropped) + (offset2 - offset1)
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
