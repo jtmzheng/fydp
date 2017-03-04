@@ -135,6 +135,7 @@ def calc_max_delay(l):
     """
     return l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
 
+
 def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
@@ -153,6 +154,7 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
                                                            n=None, closest_to=pk1_locs)
 
     max_delay = calc_max_delay(l)
+
     # Compute xcorr of the cropped signals
     max_corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, FREQ_1, FREQ_2, SAMPLING_FREQ)
     return max_corr, (delay + (offset2 - offset1))
