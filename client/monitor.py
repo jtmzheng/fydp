@@ -54,6 +54,11 @@ class Monitor:
         print("RMS: %d, prev_max: %d\n" % (sound_rms, self.max_val))
         return sound_rms < self.threshold
 
+    def delay(self, t):
+        start_time = time.clock()
+        while(time.clock() - start_time) > t:
+            pass
+
     def monitor(self):
         """Start monitoring loop
         NB: We close the old audio stream and create a new one each time
@@ -79,7 +84,7 @@ class Monitor:
                 silent = self.is_silent(snd_data)
 
             stream.stop_stream()
-            time.sleep(0.01)
+            self.delay(0.010)
             self.max_val = 0
             for cb in self.callbacks.values():
                 print 'Calling monitor callback...'

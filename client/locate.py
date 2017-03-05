@@ -24,12 +24,17 @@ N_PEAKS = 5
 PEAK_WINDOW_PREFIX = 3*36000
 PEAK_WINDOW_SUFFIX = 36000
 
+MIN_PEAK_DIST = 30000
+MAX_PEAK_DIST = 40000
+PEAK_THRESH_HIGH = 0.1
+PEAK_THRESH_LOW = 0.01
+
 def apply_butter(f1, f2, fs, sig):
     """ Apply second order Butterworth filter to sig
     fs is sampling rate
     """
     sos = sp.signal.butter(
-        10, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
+        2, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
     )
     sig = signal.sosfiltfilt(sos, sig)
     return sig
@@ -44,6 +49,7 @@ def get_n_peaks(sig, thres, min_dist, n):
     """ Gets the first n peaks > thres ([0, 1]) and greater than min_dist apart
     """
     idx = peakutils.peak.indexes(sig, thres=thres, min_dist=min_dist)
+
     return idx[:n]
 
 def movmax(seq, window=1):
@@ -106,6 +112,7 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     r_hat, theta_hat = fsolve(func, [r0, theta0])
     return r_hat, theta_hat
 
+<<<<<<< 2f6907b5c7296b629fccaf3da1f2c28354a050d7
 def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
@@ -133,16 +140,19 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
 
+=======
+>>>>>>> rising edge of signal
 def calc_max_delay(l):
     """ Compute the max delay possible given microphone center distance l
     """
     return l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
 
 
-def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
+def xcorr_peaks(sig1_cropped, sig2_cropped, offset1, offset2, l):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
+<<<<<<< 2f6907b5c7296b629fccaf3da1f2c28354a050d7
     # Median filter both signals
 
     sig1 = median_filter(sig1, MED_WINDOW_SIZE)
@@ -156,11 +166,54 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     sig1_cropped, _ , offset1, pk1_locs = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
     sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
 
-    max_delay = calc_max_delay(l)
+=======
 
+    # Crop each signal about peaks
+>>>>>>> rising edge of signal
+    max_delay = calc_max_delay(l)
     # Compute xcorr of the cropped signals
     corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
     return corr, (delay + (offset2 - offset1))
+
+def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
+    idx_peak_all = peakutils.peak.indexes(sig, thres=0, min_dist=30000)
+    idx_peak = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_high])
+    found = False
+    first_peak = 0
+    while not found:
+        if (first_peak > len(idx_peak) - N_PEAKS):
+            raise RuntimeError("Could not find peak in signal")
+        found = True
+        for i in range(N_PEAKS):
+            if (idx_peak[first_peak+i+1] - idx_peak[first_peak+i]) > MAX_PEAK_DIST:
+                first_peak += 1
+                found = False
+                break;
+
+    return idx_peak[first_peak], np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
+
+def crop_sigs(bufs):
+    pks = []
+    locations = []
+    sigs = []
+    for i in range(3):
+        sigs.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, bufs[i,:])))
+        pk, locs = find_first_peak(sigs[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
+        pks.append(pk)
+        locations.append(locs)
+
+    pk_ref = min(pks)
+
+    offsets = []
+    sigs_cropped = []
+    for i in range(3):
+        pk_ref_i = find_nearest(locations[i], pk_ref)
+        offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
+        offsets.append(pk_ref_i)
+        sig_i_cropped = sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX]
+        sigs_cropped.append(sig_i_cropped)
+
+    return (sigs_cropped, offsets)
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)

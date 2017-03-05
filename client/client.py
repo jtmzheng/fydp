@@ -143,6 +143,11 @@ class MultiBeagleReader:
         for i in range(len(bufs)):
             buf = bufs[i]
 
+            # sqlite only supports synchronous updates
+            for j in range(len(buf)):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
+
+            buf_crop, offsets = locate.crop_sigs(buf)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -150,12 +155,9 @@ class MultiBeagleReader:
                     if j != k:
                         # Map (j, k) microphone pair to xcorr task
                         results.append((
-                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k], self.readers[i].l))
+                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf_crop[j], buf_crop[k], offsets[j], offsets[k], self.readers[i].l))
                         ))
 
-            # sqlite only supports synchronous updates
-            for j in range(len(buf)):
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
             delays = np.zeros((len(buf), len(buf)), dtype=np.float)
