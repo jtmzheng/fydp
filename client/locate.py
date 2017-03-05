@@ -112,7 +112,6 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     r_hat, theta_hat = fsolve(func, [r0, theta0])
     return r_hat, theta_hat
 
-<<<<<<< 2f6907b5c7296b629fccaf3da1f2c28354a050d7
 def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
@@ -140,8 +139,6 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
 
-=======
->>>>>>> rising edge of signal
 def calc_max_delay(l):
     """ Compute the max delay possible given microphone center distance l
     """
@@ -152,24 +149,17 @@ def xcorr_peaks(sig1_cropped, sig2_cropped, offset1, offset2, l):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
-<<<<<<< 2f6907b5c7296b629fccaf3da1f2c28354a050d7
+
     # Median filter both signals
 
-    sig1 = median_filter(sig1, MED_WINDOW_SIZE)
-    sig2 = median_filter(sig2, MED_WINDOW_SIZE)
+    sig1_cropped = median_filter(sig1_cropped, MED_WINDOW_SIZE)
+    sig2_cropped = median_filter(sig2_cropped, MED_WINDOW_SIZE)
 
     # Zero mean
-    sig1 = sig1 - np.mean(sig1)
-    sig2 = sig2 - np.mean(sig2)
+    sig1_cropped = sig1_cropped - np.mean(sig1_cropped)
+    sig1_cropped = sig1_cropped - np.mean(sig1_cropped)
 
     # Crop each signal about peaks
-    sig1_cropped, _ , offset1, pk1_locs = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
-    sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
-
-=======
-
-    # Crop each signal about peaks
->>>>>>> rising edge of signal
     max_delay = calc_max_delay(l)
     # Compute xcorr of the cropped signals
     corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
