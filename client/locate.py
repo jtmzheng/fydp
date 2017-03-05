@@ -116,10 +116,8 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
     # Butterworth filter (easier to get peaks)
-
     sig = np.array(sig) # Copy so we don't modify the input when truncating
     sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-
     idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
 
     # Window the signal
@@ -145,24 +143,24 @@ def calc_max_delay(l):
     return l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
 
 
-def xcorr_peaks(sig1_cropped, sig2_cropped, offset1, offset2, l):
+def xcorr_peaks(sig1, sig2, offset1, offset2, l):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
 
     # Median filter both signals
 
-    sig1_cropped = median_filter(sig1_cropped, MED_WINDOW_SIZE)
-    sig2_cropped = median_filter(sig2_cropped, MED_WINDOW_SIZE)
+    sig1 = median_filter(sig1, MED_WINDOW_SIZE)
+    sig2 = median_filter(sig2, MED_WINDOW_SIZE)
 
     # Zero mean
-    sig1_cropped = sig1_cropped - np.mean(sig1_cropped)
-    sig1_cropped = sig1_cropped - np.mean(sig1_cropped)
+    sig1 = sig1 - np.mean(sig1)
+    sig2 = sig2 - np.mean(sig2)
 
     # Crop each signal about peaks
     max_delay = calc_max_delay(l)
     # Compute xcorr of the cropped signals
-    corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
+    corr, delay = gcc_xcorr(sig1, sig2, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
     return corr, (delay + (offset2 - offset1))
 
 def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
@@ -212,7 +210,7 @@ def crop_sigs(bufs):
         sig_i_cropped = sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX]
         sigs_cropped.append(sig_i_cropped)
 
-    return (sigs_cropped, offsets)
+    return sigs_cropped, offsets
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
