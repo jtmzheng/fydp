@@ -166,12 +166,15 @@ def xcorr_peaks(sig1_cropped, sig2_cropped, offset1, offset2, l):
     return corr, (delay + (offset2 - offset1))
 
 def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
+    """ Finds the first peak that has N_PEAKS consecutive peaks
+    following it at the correct distance apart
+    """
     idx_peak_all = peakutils.peak.indexes(sig, thres=0, min_dist=30000)
     idx_peak = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_high])
     found = False
     first_peak = 0
     while not found:
-        if (first_peak > len(idx_peak) - N_PEAKS):
+        if (first_peak > (len(idx_peak) - N_PEAKS - 1)):
             raise RuntimeError("Could not find peak in signal")
         found = True
         for i in range(N_PEAKS):
@@ -183,6 +186,12 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
     return idx_peak[first_peak], np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
 
 def crop_sigs(bufs):
+    """ Given 3 signals, crop all 3 at the "first peak" detected for all signals
+    This is done by finding the "first peak" for each signal.
+    The "reference peak" is the earlierst "first peak"
+    Then, we crop each signal at their respective peaks that is closest to the
+    reference peak
+    """
     pks = []
     locations = []
     sigs = []
