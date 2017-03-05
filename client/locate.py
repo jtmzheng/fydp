@@ -29,7 +29,7 @@ def apply_butter(f1, f2, fs, sig):
     fs is sampling rate
     """
     sos = sp.signal.butter(
-        10, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
+        2, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
     )
     sig = signal.sosfiltfilt(sos, sig)
     return sig
@@ -52,7 +52,7 @@ def movmax(seq, window=1):
     #assert len(seq) >= window
     return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).max().values.T[0]
 
-def mov_median(seq, window=1):
+def median_filter(seq, window=1):
     """Moving windowed median over seq of input window size
     """
     #assert len(seq) >= window
@@ -110,8 +110,8 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
     # Butterworth filter (easier to get peaks)
+    sig = np.array(sig) # Copy so we don't modify the input when truncating
     sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-
     idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
 
     # Window the signal
@@ -122,10 +122,12 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
         pk_locs = (idx[0], idx[-1])
 
     else:
+        # NB: No codepath to this yet
         pk_locs = (find_nearest(idx,closest_to[0]), find_nearest(idx,closest_to[1]))
         offset_low = (pk_locs[0]-PEAK_WINDOW_PREFIX)
         offset_high = (pk_locs[-1]+PEAK_WINDOW_SUFFIX)
 
+    # Truncate the input
     sig_butter = sig_butter[offset_low:offset_high]
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
@@ -141,8 +143,8 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     first N peaks (crop around these peaks)
     """
     # Median filter both signals
-    sig1 = mov_median(sig1, MED_WINDOW_SIZE)
-    sig2 = mov_median(sig2, MED_WINDOW_SIZE)
+    sig1 = median_filter(sig1, MED_WINDOW_SIZE)
+    sig2 = median_filter(sig2, MED_WINDOW_SIZE)
 
     # Zero mean
     sig1 = sig1 - np.mean(sig1)
@@ -150,8 +152,7 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
 
     # Crop each signal about peaks
     sig1_cropped, _ , offset1, pk1_locs = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
-    sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.3, min_dist=1000,
-                                                           n=None, closest_to=pk1_locs)
+    sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
 
     max_delay = calc_max_delay(l)
 
@@ -187,9 +188,10 @@ def next_pow_2(n):
 
 def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     """ GCC-PHAT windowed on [fmin, fmax]
+
+    offset: difference in truncation difference in start for sig1, sig2
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
-    # print Nfft, np.log2(Nfft)
 
     SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
     SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
