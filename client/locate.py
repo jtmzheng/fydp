@@ -21,12 +21,12 @@ FREQ_2 = 262+75 #Hz
 
 # Number of peaks we want to window signal over
 N_PEAKS = 5
-PEAK_WINDOW_PREFIX = 3*36000
-PEAK_WINDOW_SUFFIX = 36000
+PEAK_WINDOW_PREFIX = 2*36000
+PEAK_WINDOW_SUFFIX = 0*36000
 
-MIN_PEAK_DIST = 30000
-MAX_PEAK_DIST = 40000
-PEAK_THRESH_HIGH = 0.1
+MIN_PEAK_DIST = 26000
+MAX_PEAK_DIST = 46000
+PEAK_THRESH_HIGH = 0.15
 PEAK_THRESH_LOW = 0.01
 
 def apply_butter(f1, f2, fs, sig):
@@ -167,13 +167,17 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
     """ Finds the first peak that has N_PEAKS consecutive peaks
     following it at the correct distance apart
     """
-    idx_peak_all = peakutils.peak.indexes(sig, thres=0, min_dist=30000)
+    idx_peak_all = peakutils.peak.indexes(sig, thres=0, min_dist=MIN_PEAK_DIST)
     idx_peak = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_high])
+    idx_peak_low = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
     found = False
     first_peak = 0
     while not found:
         if (first_peak > (len(idx_peak) - N_PEAKS - 1)):
-            raise RuntimeError("Could not find peak in signal")
+            # Here we assume signal to noise ratio for this
+            # microphone is too low. So return NaN
+            return float('nan'), idx_peak_low
+
         found = True
         for i in range(N_PEAKS):
             if (idx_peak[first_peak+i+1] - idx_peak[first_peak+i]) > MAX_PEAK_DIST:
@@ -181,36 +185,51 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
                 found = False
                 break;
 
-    return idx_peak[first_peak], np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
+    return idx_peak[first_peak], idx_peak_low
 
 def crop_sigs(bufs):
-    """ Given 3 signals, crop all 3 at the "first peak" detected for all signals
+    """ Given N signals, crop all N at the "first peak" detected for all signals
     This is done by finding the "first peak" for each signal.
-    The "reference peak" is the earlierst "first peak"
+    The "reference peak" is the earliest "first peak"
     Then, we crop each signal at their respective peaks that is closest to the
     reference peak
     """
     pks = []
     locations = []
-    sigs = []
-    for i in range(3):
-        sigs.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, bufs[i,:])))
-        pk, locs = find_first_peak(sigs[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
+
+    """
+    sigs_butter_cropped, sigs_cropped = [], []
+    offsets = []
+
+    for i in range(len(bufs)):
+        sig_cropped, sig_butter, offset, _ = find_peak_window(bufs[i], thres=0.6, min_dist=1000, n=N_PEAKS)
+        sigs_butter_cropped.append(sig_butter)
+        sigs_cropped.append(sig_cropped)
+        offsets.append(offset)
+    """
+
+    sigs_butter, sigs = [], []
+    for i in range(len(bufs)):
+        sigs.append(np.array(bufs[i]))
+        sigs_butter.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sigs[i])))
+        pk, locs = find_first_peak(sigs_butter[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
         pks.append(pk)
         locations.append(locs)
 
-    pk_ref = min(pks)
+    pk_ref = np.nanmin(pks)
+    if np.isnan(pk_ref):
+        raise RuntimeError("Could not find a reference peak")
 
     offsets = []
-    sigs_cropped = []
-    for i in range(3):
+    sigs_cropped, sigs_butter_cropped = [], []
+    for i in range(len(bufs)):
         pk_ref_i = find_nearest(locations[i], pk_ref)
         offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
         offsets.append(pk_ref_i)
-        sig_i_cropped = sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX]
-        sigs_cropped.append(sig_i_cropped)
+        sigs_butter_cropped.append(sigs_butter[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
+        sigs_cropped.append(sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
 
-    return sigs_cropped, offsets
+    return sigs_cropped, sigs_butter_cropped, offsets
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)

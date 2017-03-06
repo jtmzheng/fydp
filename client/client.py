@@ -147,7 +147,7 @@ class MultiBeagleReader:
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
-            buf_crop, offsets = locate.crop_sigs(buf)
+            buf_crop, _, offsets = locate.crop_sigs(buf)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
