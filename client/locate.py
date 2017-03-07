@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, root, least_squares
 from scipy import signal
 
 import math
@@ -36,8 +36,8 @@ def apply_butter(f1, f2, fs, sig):
     sos = sp.signal.butter(
         2, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
     )
-    sig = signal.sosfiltfilt(sos, sig)
-    return sig
+    sig_butter = signal.sosfiltfilt(sos, sig)
+    return sig_butter
 
 def normalize_signal(sig):
     """ Normalize signal and zero-mean
@@ -52,7 +52,7 @@ def get_n_peaks(sig, thres, min_dist, n):
 
     return idx[:n]
 
-def movmax(seq, window=1):
+def movmax(seq, window=MED_WINDOW_SIZE):
     """Moving windowed max over seq of input window size
     """
     #assert len(seq) >= window
@@ -97,7 +97,7 @@ def generate_delay_func(f1, f2, l):
             math.sqrt(r*r + l*l - 2*l*r*math.cos(theta)) -
             f2*SPEED_SOUND
         )
-        return f
+        return np.array(f)
     return delay_func
 
 def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
@@ -109,17 +109,18 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     f1 = float(f1) / SAMPLING_FREQ
     f2 = float(f1) / SAMPLING_FREQ
     func = generate_delay_func(f1, f2, l)
-    r_hat, theta_hat = fsolve(func, [r0, theta0])
+    #sol = root(func, [r0, theta0], method='lm')
+    sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
+    print 'Optimizer message: %s' % sol.message
+    r_hat, theta_hat = sol.x[0], sol.x[1]
     return r_hat, theta_hat
 
 def find_peak_window(sig, thres, min_dist, n, closest_to=None):
     """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
     """
     # Butterworth filter (easier to get peaks)
-
     sig = np.array(sig) # Copy so we don't modify the input when truncating
     sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-
     idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
 
     # Window the signal
@@ -149,9 +150,7 @@ def xcorr_peaks(sig1_cropped, sig2_cropped, offset1, offset2, l):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
-
     # Median filter both signals
-
     sig1_cropped = median_filter(sig1_cropped, MED_WINDOW_SIZE)
     sig2_cropped = median_filter(sig2_cropped, MED_WINDOW_SIZE)
 
@@ -186,33 +185,46 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
     return idx_peak[first_peak], np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
 
 def crop_sigs(bufs):
-    """ Given 3 signals, crop all 3 at the "first peak" detected for all signals
+    """ Given N signals, crop all N at the "first peak" detected for all signals
     This is done by finding the "first peak" for each signal.
-    The "reference peak" is the earlierst "first peak"
+    The "reference peak" is the earliest "first peak"
     Then, we crop each signal at their respective peaks that is closest to the
     reference peak
     """
     pks = []
     locations = []
-    sigs = []
-    for i in range(3):
-        sigs.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, bufs[i,:])))
-        pk, locs = find_first_peak(sigs[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
+
+    sigs_butter_cropped, sigs_cropped = [], []
+    offsets = []
+
+    for i in range(len(bufs)):
+        sig_cropped, sig_butter, offset, _ = find_peak_window(bufs[i], thres=0.6, min_dist=1000, n=N_PEAKS)
+        sigs_butter_cropped.append(sig_butter)
+        sigs_cropped.append(sig_cropped)
+        offsets.append(offset)
+    """
+
+    sigs_butter, sigs = [], []
+    for i in range(len(bufs)):
+        sigs.append(np.array(bufs[i]))
+        sigs_butter.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sigs[i])))
+        pk, locs = find_first_peak(sigs_butter[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
         pks.append(pk)
         locations.append(locs)
 
     pk_ref = min(pks)
-
     offsets = []
-    sigs_cropped = []
-    for i in range(3):
+    sigs_cropped, sigs_butter_cropped = [], []
+    for i in range(len(bufs)):
         pk_ref_i = find_nearest(locations[i], pk_ref)
         offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
         offsets.append(pk_ref_i)
-        sig_i_cropped = sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX]
-        sigs_cropped.append(sig_i_cropped)
+        sigs_butter_cropped.append(sigs_butter[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
+        sigs_cropped.append(sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
 
-    return (sigs_cropped, offsets)
+    """
+
+    return sigs_cropped, sigs_butter_cropped, offsets
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
@@ -246,7 +258,6 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     offset: difference in truncation difference in start for sig1, sig2
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
-    # print Nfft, np.log2(Nfft)
 
     SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
     SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
