@@ -150,6 +150,7 @@ class MultiBeagleReader:
         # NB: Write data to db, order of arrays/mics is arbitrary
         exp_id = db.create_experiment(self.src_x, self.src_y, self.comment)
 
+        angles = []
         for i in range(len(bufs)):
             buf = bufs[i]
 
@@ -176,17 +177,19 @@ class MultiBeagleReader:
                 delays[key[0]][key[1]] = val.get(timeout=self.timeout)[1] # xcorr (val, delay) tuple
                 delays[key[1]][key[0]] = -delays[key[0]][key[1]]
 
+            print '------- Delay Matrix -------'
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
             farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
+            angles.append(np.rad2deg(farwave_ang))
             print("Far Wave Angle: %r\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
                 if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
                     lr = MIC_IND_LR[j]
-                    print 'Using microphone %d as closest mic - (%d left, %d right)' % (j, lr[0], lr[1])
+                    print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
                     r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     arr_id = db.create_array(
                         exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
@@ -201,6 +204,17 @@ class MultiBeagleReader:
         # Clean up
         pool.close()
         pool.join()
+
+        # Calc estimated position and store in db
+        assert len(bufs) == 2
+        pos = locate.calc_poi(
+            np.array([self.readers[0].x, self.readers[0].y]),
+            np.array([self.readers[1].x, self.readers[1].y]),
+            np.array([np.sin(angles[0]), np.cos(angles[0])]),
+            np.array([np.sin(angles[1]), np.cos(angles[1])])
+        )
+        print 'Estimated position: %f, %f' % (pos[0], pos[1])
+        db.set_pos_estimate(exp_id, pos[0], pos[1])
         return bufs
 
 def run(argv):
@@ -251,8 +265,7 @@ def run(argv):
 
     m = Monitor(300, runs)
 
-    # NB: For testing I ran a second local server on port 5556
-    # TODO: Use different hosts/ports
+    # NB: Use same port for both hosts
     br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
     br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
 

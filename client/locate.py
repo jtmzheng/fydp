@@ -288,6 +288,13 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
 
     return (samples, corr), delay
 
+def calc_poi(p1, p2, v1, v2):
+    """ Calculate POI of two rays (p1 + t*v1) and (p2 + t*v2)
+    NB: Assume all inputs are ndarrays
+    """
+    par = np.dot(np.linalg.pinv(np.array([[v1[0], -v2[0]], [v1[1], -v2[1]]])), p2 - p1)
+    return p1 + par[0] * v1; # Equivalent to p2 + par[1]*v2
+
 if __name__ == '__main__':
     # Test position
     r = 2 # [m]
