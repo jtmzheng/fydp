@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, root, least_squares
 from scipy import signal
 
 import math
@@ -21,8 +21,13 @@ FREQ_2 = 262+75 #Hz
 
 # Number of peaks we want to window signal over
 N_PEAKS = 5
-PEAK_WINDOW_PREFIX = 3*36000
-PEAK_WINDOW_SUFFIX = 36000
+PEAK_WINDOW_PREFIX = 2*36000
+PEAK_WINDOW_SUFFIX = 0*36000
+
+MIN_PEAK_DIST = 26000
+MAX_PEAK_DIST = 46000
+PEAK_THRESH_HIGH = 0.15
+PEAK_THRESH_LOW = 0.01
 
 def apply_butter(f1, f2, fs, sig):
     """ Apply second order Butterworth filter to sig
@@ -31,8 +36,8 @@ def apply_butter(f1, f2, fs, sig):
     sos = sp.signal.butter(
         2, (np.array([f1, f2]) / (fs / 2)), btype='bandpass', analog=False, output='sos'
     )
-    sig = signal.sosfiltfilt(sos, sig)
-    return sig
+    sig_butter = signal.sosfiltfilt(sos, sig)
+    return sig_butter
 
 def normalize_signal(sig):
     """ Normalize signal and zero-mean
@@ -44,9 +49,10 @@ def get_n_peaks(sig, thres, min_dist, n):
     """ Gets the first n peaks > thres ([0, 1]) and greater than min_dist apart
     """
     idx = peakutils.peak.indexes(sig, thres=thres, min_dist=min_dist)
+
     return idx[:n]
 
-def movmax(seq, window=1):
+def movmax(seq, window=MED_WINDOW_SIZE):
     """Moving windowed max over seq of input window size
     """
     #assert len(seq) >= window
@@ -91,7 +97,7 @@ def generate_delay_func(f1, f2, l):
             math.sqrt(r*r + l*l - 2*l*r*math.cos(theta)) -
             f2*SPEED_SOUND
         )
-        return f
+        return np.array(f)
     return delay_func
 
 def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
@@ -104,6 +110,10 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     f2 = float(f1) / SAMPLING_FREQ
     func = generate_delay_func(f1, f2, l)
     r_hat, theta_hat = fsolve(func, [r0, theta0])
+    #sol = root(func, [r0, theta0], method='lm')
+    #sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
+    #print 'Optimizer message: %s' % sol.message
+    #r_hat, theta_hat = sol.x[0], sol.x[1]
     return r_hat, theta_hat
 
 def find_peak_window(sig, thres, min_dist, n, closest_to=None):
@@ -127,7 +137,6 @@ def find_peak_window(sig, thres, min_dist, n, closest_to=None):
         offset_low = (pk_locs[0]-PEAK_WINDOW_PREFIX)
         offset_high = (pk_locs[-1]+PEAK_WINDOW_SUFFIX)
 
-    # Truncate the input
     sig_butter = sig_butter[offset_low:offset_high]
     sig = sig[offset_low:offset_high]
     return sig, sig_butter, offset_low, pk_locs
@@ -138,7 +147,7 @@ def calc_max_delay(l):
     return l*math.sqrt(3)*SAMPLING_FREQ/SPEED_SOUND
 
 
-def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
+def xcorr_peaks(sig1, sig2, offset1, offset2, l):
     """ Compute cross-correlation after applying a Buttersworth filter (see IPython notebook) to find
     first N peaks (crop around these peaks)
     """
@@ -151,14 +160,77 @@ def xcorr_peaks(sig1, sig2, l, n=N_PEAKS):
     sig2 = sig2 - np.mean(sig2)
 
     # Crop each signal about peaks
-    sig1_cropped, _ , offset1, pk1_locs = find_peak_window(sig1, thres=0.6, min_dist=1000, n=n)
-    sig2_cropped, _ , offset2, pk2_locs = find_peak_window(sig2, thres=0.6, min_dist=1000, n=n)
-
     max_delay = calc_max_delay(l)
-
     # Compute xcorr of the cropped signals
-    corr, delay = gcc_xcorr(sig1_cropped, sig2_cropped, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
+    corr, delay = gcc_xcorr(sig1, sig2, max_delay, -(offset2 - offset1), FREQ_1, FREQ_2, SAMPLING_FREQ)
     return corr, (delay + (offset2 - offset1))
+
+def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
+    """ Finds the first peak that has N_PEAKS consecutive peaks
+    following it at the correct distance apart
+    """
+    idx_peak_all = peakutils.peak.indexes(sig, thres=0, min_dist=MIN_PEAK_DIST)
+    idx_peak = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_high])
+    idx_peak_low = np.array([i for i in idx_peak_all if sig[i] >= peak_thresh_low])
+    found = False
+    first_peak = 0
+    while not found:
+        if (first_peak > (len(idx_peak) - N_PEAKS - 1)):
+            # Here we assume signal to noise ratio for this
+            # microphone is too low. So return NaN
+            return float('nan'), idx_peak_low
+
+        found = True
+        for i in range(N_PEAKS):
+            if (idx_peak[first_peak+i+1] - idx_peak[first_peak+i]) > MAX_PEAK_DIST:
+                first_peak += 1
+                found = False
+                break;
+
+    return idx_peak[first_peak], idx_peak_low
+
+def crop_sigs(bufs):
+    """ Given N signals, crop all N at the "first peak" detected for all signals
+    This is done by finding the "first peak" for each signal.
+    The "reference peak" is the earliest "first peak"
+    Then, we crop each signal at their respective peaks that is closest to the
+    reference peak
+    """
+    pks = []
+    locations = []
+    """
+    sigs_butter_cropped, sigs_cropped = [], []
+    offsets = []
+
+    for i in range(len(bufs)):
+        sig_cropped, sig_butter, offset, _ = find_peak_window(bufs[i], thres=0.6, min_dist=1000, n=N_PEAKS)
+        sigs_butter_cropped.append(sig_butter)
+        sigs_cropped.append(sig_cropped)
+        offsets.append(offset)
+    """
+
+    sigs_butter, sigs = [], []
+    for i in range(len(bufs)):
+        sigs.append(np.array(bufs[i]))
+        sigs_butter.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sigs[i])))
+        pk, locs = find_first_peak(sigs_butter[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
+        pks.append(pk)
+        locations.append(locs)
+
+    pk_ref = np.nanmin(pks)
+    if np.isnan(pk_ref):
+        raise RuntimeError("Could not find a reference peak")
+
+    offsets = []
+    sigs_cropped, sigs_butter_cropped = [], []
+    for i in range(len(bufs)):
+        pk_ref_i = find_nearest(locations[i], pk_ref)
+        offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
+        offsets.append(pk_ref_i)
+        sigs_butter_cropped.append(sigs_butter[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
+        sigs_cropped.append(sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
+
+    return sigs_cropped, sigs_butter_cropped, offsets
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
@@ -215,6 +287,13 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     delay = -samples[ind]
 
     return (samples, corr), delay
+
+def calc_poi(p1, p2, v1, v2):
+    """ Calculate POI of two rays (p1 + t*v1) and (p2 + t*v2)
+    NB: Assume all inputs are ndarrays
+    """
+    par = np.dot(np.linalg.pinv(np.array([[v1[0], -v2[0]], [v1[1], -v2[1]]])), p2 - p1)
+    return p1 + par[0] * v1; # Equivalent to p2 + par[1]*v2
 
 if __name__ == '__main__':
     # Test position

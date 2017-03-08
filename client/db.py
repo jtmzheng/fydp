@@ -39,13 +39,23 @@ def with_cursor(func):
     return query
 
 @with_cursor
-def create_experiment(cur, src_x, src_y, comment):
+def create_experiment(cur, x, y, comment):
     try:
         cur.execute('INSERT INTO experiment(datetime, x, y, comment) VALUES (:datetime, :x, :y, :comment)',
-            {'datetime': int(time.time()), 'x': src_x, 'y': src_y, 'comment': comment})
+            {'datetime': int(time.time()), 'x': x, 'y': y, 'comment': comment})
         return cur.lastrowid
     except sqlite3.IntegrityError as s:
         print 'Error creating experiment: %s' % s.message
+        raise s
+
+@with_cursor
+def set_pos_estimate(cur, exp_id, x_hat, y_hat):
+    try:
+        cur.execute('UPDATE experiment SET x_hat=:x_hat, y_hat=:y_hat WHERE id=:exp_id',
+            {'x_hat': x_hat, 'y_hat': y_hat, 'exp_id': exp_id})
+        return
+    except sqlite3.IntegrityError as s:
+        print 'Error setting xhat, yhat: %s' % s.message
         raise s
 
 @with_cursor
@@ -90,7 +100,7 @@ def get_mic_data(cur, exp_id, arr_id, mic_id):
 
 
 if __name__ == '__main__':
-    exp_id = create_experiment(1, 1, 'No comment')
+    exp_id = create_experiment(1, 1, 1.01, 1.01, 'No comment')
     print 'Experiment ID: %s' % str(exp_id)
     array = create_array(exp_id, 1, 0.1, 0.2)
     print 'Array ID: %s' % str(array)

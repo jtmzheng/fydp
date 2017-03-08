@@ -17,8 +17,9 @@ from multiprocessing import Pool
 from monitor import Monitor
 
 MAX_CHUNK_SIZE = 4096
-#DEFAULT_HOSTNAME = '192.168.7.2'
-DEFAULT_HOSTNAME = 'localhost'
+DEFAULT_HOSTNAME = '192.168.7.2'
+DEFAULT_HOSTNAME_2 = '192.168.8.2'
+#DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
 
 # Maps angle from microphone local coordinates to array coordinates (rotation to mic 0 axis)
@@ -26,6 +27,13 @@ ANGLE_OFFSET = {
     0: 0,
     1: 2.0944, # 120 deg in rad
     2: 4.18879, # 240 deg in rad
+}
+
+# Maps each microphone to the index of left and right microphones relative to it
+MIC_IND_LR = {
+    0: (1, 2),
+    1: (2, 0),
+    2: (0, 1)
 }
 
 
@@ -134,15 +142,23 @@ class MultiBeagleReader:
 
     def read(self):
         pool = Pool(processes=min(len(self.readers)+4, 4))
+
+        # Fetch the data from Beaglebones asynchronously to ensure ~ temporally consistent
         results = [pool.apply_async(reader, ()) for reader in self.readers]
         bufs = [res.get(timeout=self.timeout) for res in results]
 
         # NB: Write data to db, order of arrays/mics is arbitrary
         exp_id = db.create_experiment(self.src_x, self.src_y, self.comment)
 
+        angles = []
         for i in range(len(bufs)):
             buf = bufs[i]
 
+            # sqlite only supports synchronous updates
+            for j in range(len(buf)):
+                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
+
+            buf_crop, _, offsets = locate.crop_sigs(buf)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -150,12 +166,9 @@ class MultiBeagleReader:
                     if j != k:
                         # Map (j, k) microphone pair to xcorr task
                         results.append((
-                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf[j], buf[k], self.readers[i].l))
+                            (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf_crop[j], buf_crop[k], offsets[j], offsets[k], self.readers[i].l))
                         ))
 
-            # sqlite only supports synchronous updates
-            for j in range(len(buf)):
-                mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
             delays = np.zeros((len(buf), len(buf)), dtype=np.float)
@@ -164,17 +177,20 @@ class MultiBeagleReader:
                 delays[key[0]][key[1]] = val.get(timeout=self.timeout)[1] # xcorr (val, delay) tuple
                 delays[key[1]][key[0]] = -delays[key[0]][key[1]]
 
+            print '------- Delay Matrix -------'
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
             farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
+            angles.append(np.rad2deg(farwave_ang))
             print("Far Wave Angle: %r\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
                 if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
-                    print 'Using microphone %d as closest mic' % j
-                    r, theta = locate.locate(delays[j][(j+1)%3], delays[j][(j+2)%3], self.readers[i].l)
+                    lr = MIC_IND_LR[j]
+                    print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
+                    r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     arr_id = db.create_array(
                         exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
                     )
@@ -188,6 +204,17 @@ class MultiBeagleReader:
         # Clean up
         pool.close()
         pool.join()
+
+        # Calc estimated position and store in db
+        assert len(bufs) == 2
+        pos = locate.calc_poi(
+            np.array([self.readers[0].x, self.readers[0].y]),
+            np.array([self.readers[1].x, self.readers[1].y]),
+            np.array([np.sin(angles[0]), np.cos(angles[0])]),
+            np.array([np.sin(angles[1]), np.cos(angles[1])])
+        )
+        print 'Estimated position: %f, %f' % (pos[0], pos[1])
+        db.set_pos_estimate(exp_id, pos[0], pos[1])
         return bufs
 
 def run(argv):
@@ -195,6 +222,7 @@ def run(argv):
     """
     portno = DEFAULT_PORT
     hostname = DEFAULT_HOSTNAME
+    hostname_2 = DEFAULT_HOSTNAME_2
 
     try:
         opts, args = getopt.getopt(argv, 'h:p:',['hostname=', 'port='])
@@ -208,20 +236,28 @@ def run(argv):
             elif opt in ("-h", "--hostname"):
                 print ('Hostname: %s' % arg)
                 hostname = arg
+            elif opt in ("-h2", "--hostname2"):
+                print ('Hostname 2: %s' % arg)
+                hostname_2 = arg
     except getopt.GetoptError:
-        print 'client.py -h <hostname> -p <port>'
+        print 'client.py -h <hostname> -h2 <hostname_2> -p <port>'
         print 'Using default host localhost and default port 5555'
 
 
     # Parse user input (TODO: Some sort of config file?)
-    print 'Enter sound source location:'
-    src_x = float(raw_input('x: '))
-    src_y = float(raw_input('y: '))
+    print 'Enter sound source location (origin by default):'
+    src_x = float(raw_input('x: ') or '0')
+    src_y = float(raw_input('y: ') or '0')
     print 'Enter array 1 position:'
     x1 = float(raw_input('x: '))
     y1 = float(raw_input('y: '))
-    print 'Enter array length:'
+    print 'Enter array 2 position'
+    x2 = float(raw_input('x: '))
+    y2 = float(raw_input('y: '))
+    print 'Enter array 1 length:'
     l1 = float(raw_input('l: '))
+    print 'Enter array 2 length (Same as array 1 by default):'
+    l2 = float(raw_input('l: ') or l1)
     print 'Enter number of runs (Default 1)'
     runs = int((raw_input('Runs: ') or '1'))
     print 'Enter experiment descriptor (Optional)'
@@ -229,14 +265,17 @@ def run(argv):
 
     m = Monitor(300, runs)
 
-    # NB: For testing I ran a second local server on port 5556
-    # TODO: Use different hosts/ports
+    # NB: Use same port for both hosts
     br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
-    # br_2 = BeagleReader(hostname, 5556, 0, 0, 30)
+    br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
+
+    # NB: Enable below to test locally with test local server(s) running
+    #br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
+    #br_2 = BeagleReader('localhost', 5556, x=x2, y=y2, l=l2, samples=0)
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
-    mbr = MultiBeagleReader([br_1,], src_x, src_y, 100, comment)
+    mbr = MultiBeagleReader([br_1, br_2], src_x, src_y, 100, comment)
 
     m.add_callback('[MultiBeagleReader::read]', mbr.read)
     m.monitor()

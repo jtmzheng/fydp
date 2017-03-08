@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS experiment (
     datetime    INTEGER,
     x           REAL,
     y           REAL,
+    x_hat       REAL DEFAULT 0,
+    y_hat       REAL DEFAULT 0,
 
     /* Describe experiment */
     comment     text
