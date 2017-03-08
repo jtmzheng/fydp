@@ -28,6 +28,13 @@ ANGLE_OFFSET = {
     2: 4.18879, # 240 deg in rad
 }
 
+# Maps each microphone to the index of left and right microphones relative to it
+MIC_IND_LR = {
+    0: (1, 2),
+    1: (2, 0),
+    2: (0, 1)
+}
+
 
 def read_data(sock, nbytes):
     """Read nbytes of data from socket
@@ -175,8 +182,9 @@ class MultiBeagleReader:
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
                 if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
-                    print 'Using microphone %d as closest mic' % j
-                    r, theta = locate.locate(delays[j][(j+1)%3], delays[j][(j+2)%3], self.readers[i].l)
+                    lr = MIC_IND_LR[j]
+                    print 'Using microphone %d as closest mic - (%d left, %d right)' % (j, lr[0], lr[1])
+                    r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     arr_id = db.create_array(
                         exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
                     )

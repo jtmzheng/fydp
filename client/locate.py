@@ -109,10 +109,11 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     f1 = float(f1) / SAMPLING_FREQ
     f2 = float(f1) / SAMPLING_FREQ
     func = generate_delay_func(f1, f2, l)
+    r_hat, theta_hat = fsolve(func, [r0, theta0])
     #sol = root(func, [r0, theta0], method='lm')
-    sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
-    print 'Optimizer message: %s' % sol.message
-    r_hat, theta_hat = sol.x[0], sol.x[1]
+    #sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
+    #print 'Optimizer message: %s' % sol.message
+    #r_hat, theta_hat = sol.x[0], sol.x[1]
     return r_hat, theta_hat
 
 def find_peak_window(sig, thres, min_dist, n, closest_to=None):

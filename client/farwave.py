@@ -3,15 +3,20 @@ import numpy as np
 import locate
 
 from enum import Enum
+
 class MIC_PAIRS(Enum):
     MIC0_1 = 1
     MIC2_0 = 2
     MIC1_2 = 3
 
 def wrap_angle(angle):
-    return (angle + np.pi) % (2 * np.pi ) - np.pi
+    """ Wrap angle in [-pi, pi] radians
+    """
+    return (angle + np.pi) % (2. * np.pi) - np.pi
 
 def combine_angles(angles, errors):
+    """ FIXME
+    """
     a0 = wrap_angle(angles[0])
     a1 = wrap_angle(angles[1])
     a2 = wrap_angle(angles[2])
@@ -29,9 +34,9 @@ def combine_angles(angles, errors):
                  w0 * cos(a0) + w1 * cos(a1) + w2 * cos(a2))
 
 def calc_far_wave_angle(delays, max_delay, pair_num):
-
+    """ FIXME
+    """
     pos_ang = True
-
     if pair_num == MIC_PAIRS.MIC0_1:
         delay = delays[0][1]
         pos_ang = np.mean((delays[2][1], delays[2][0])) > 0
@@ -46,7 +51,9 @@ def calc_far_wave_angle(delays, max_delay, pair_num):
 
     normalized_delay = float(delay)/abs(max_delay)
     ang_raw = acos(normalized_delay)
-    error_est = 1/sqrt(1-normalized_delay**2) # derivative of arccos, measures sensitivity of far wave
+
+    # Derivative of acos used to quantify sensitivity of far wave
+    error_est = 1. / sqrt(1. - normalized_delay**2)
     if not pos_ang:
         ang_raw = -ang_raw
 
@@ -62,6 +69,8 @@ def calc_far_wave_angle(delays, max_delay, pair_num):
     return (ang, error_est)
 
 def calc_angle(delays, l):
+    """ FIXME
+    """
     angles = []
     errors = []
     max_delay = locate.calc_max_delay(l)
@@ -71,7 +80,12 @@ def calc_angle(delays, l):
         angles.append(far_ang[0])
         errors.append(far_ang[1])
 
-    print("Angles: %r\nErrors: %r\n" % ([degrees(ang) for ang in angles], errors))
+    print 'Angles: %r\nErrors: %r\n' % ([degrees(ang) for ang in angles], errors)
 
-    final_ang = degrees(combine_angles(angles, errors))
+    # Map final angle to CCW and [0, 360]
+    final_ang = degrees(combine_angles(angles, errors)) # CW
+    print 'Angle (CW): %f' % final_ang
+    final_ang = -final_ang #CW -> CCW
+    if final_ang < 0:
+        final_ang = 360. - np.abs(final_ang)             # [-180, 180] -> [0, 360]
     return final_ang
