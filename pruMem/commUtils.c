@@ -149,17 +149,22 @@ int send_request(comm_handle_t *pCommHandle, data_buffer_t *pMappedDataBuffer)
 
     printf("Sending Data Size: %d\n", num_samples_to_send);
     ret = write_data(pCommHandle->mNewSocketFd, (char*)&num_samples_to_send_nt, 4);
-    if (ret == 0 && num_samples_to_send > 0)
+
+    if (ret == 0 && num_samples_to_send > pMappedDataBuffer->mBufferSize[1])
     {
-        int num_sent_data = MIN(pMappedDataBuffer->mBufferSize[0], num_samples_to_send);
-        ret = write_data(pCommHandle->mNewSocketFd, (char*)pMappedDataBuffer->mData[0], num_sent_data);
-        num_samples_to_send -= num_sent_data;
+        int num_to_send_buf0 = num_samples_to_send - pMappedDataBuffer->mBufferSize[1];
+        char *buff_start = ((char*)pMappedDataBuffer->mData[0]) + pMappedDataBuffer->mBufferSize[0] - num_to_send_buf0;
+
+        ret = write_data(pCommHandle->mNewSocketFd, buff_start, num_to_send_buf0);
+        num_samples_to_send -= num_to_send_buf0;
     }
 
     if (ret == 0 && num_samples_to_send > 0)
     {
-        int num_sent_data = MIN(pMappedDataBuffer->mBufferSize[1], num_samples_to_send);
-        ret = write_data(pCommHandle->mNewSocketFd, (char*)pMappedDataBuffer->mData[1], num_sent_data);
+        int num_to_send_buf1 = MIN(pMappedDataBuffer->mBufferSize[1], num_samples_to_send);
+        char *buff_start = ((char*)pMappedDataBuffer->mData[1]) + pMappedDataBuffer->mBufferSize[1] - num_to_send_buf1;
+
+        ret = write_data(pCommHandle->mNewSocketFd, buff_start, num_to_send_buf1);
     }
     close(pCommHandle->mNewSocketFd);
     pCommHandle->mNewSocketFd = 0;
