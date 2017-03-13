@@ -181,9 +181,9 @@ class MultiBeagleReader:
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
-            farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
-            angles.append(np.rad2deg(farwave_ang))
-            print("Far Wave Angle: %r\n" % farwave_ang)
+            farwave_ang = np.deg2rad(farwave.calc_angle(delays, self.readers[i].l))
+            angles.append(farwave_ang) # Store in radians
+            print("Far Wave Angle: %r rad\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
@@ -192,7 +192,7 @@ class MultiBeagleReader:
                     print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
                     r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     arr_id = db.create_array(
-                        exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
+                        exp_id, i, self.readers[i].x, self.readers[i].y, r, farwave_ang #theta + ANGLE_OFFSET[j]
                     )
                     break
 

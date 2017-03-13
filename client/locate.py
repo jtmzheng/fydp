@@ -250,6 +250,9 @@ def crop_sigs_npeaks(bufs):
             sig_filt, thres=0.6, min_dist=1000, n=N_PEAKS
         )
 
+        if np.any(idx-PEAK_WINDOW_PREFIX < 0):
+            raise RuntimeError('Error invalid index in %s' % str(idx))
+
         pks_idx.append(idx)
         max_idx = max(max_idx, idx[-1])
         min_idx = min(min_idx, idx[0])
@@ -289,13 +292,16 @@ def crop_sigs_rising_edge(bufs):
 
     pk_ref = np.nanmin(pks)
     if np.isnan(pk_ref):
-        raise RuntimeError("Could not find a reference peak")
+        raise RuntimeError('Could not find a reference peak')
 
     offsets = []
     sigs_cropped, sigs_butter_cropped, sigs_win = [], [], []
     for i in range(len(bufs)):
         pk_ref_i = find_nearest(locations[i], pk_ref)
         offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
+        if offset_i < 0:
+            raise RuntimeError('Error invalid index in %s' % str(offset_i))
+
         offsets.append(pk_ref_i)
         sigs_butter_cropped.append(sigs_butter[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
         sigs_cropped.append(sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
