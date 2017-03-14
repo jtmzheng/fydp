@@ -158,7 +158,14 @@ class MultiBeagleReader:
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
-            buf_crop, _, offsets, _ = locate.crop_sigs_npeaks(buf)
+            # apply median and ideal bp in parallel
+            results = [pool.apply_async(locate.filter_sigs, args=(buf_i)) for buf_i in buf]
+            sigs, sigs_filt = [], []
+            for j in range(len(buf)):
+                sigs.append(res.get(timeout=self.timeout)[0])
+                sigs_filt.append(res.get(timeout=self.timeout)[1])
+
+            buf_crop, _, offsets, _ = locate.crop_sigs_npeaks(sigs, sigs_filt)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -186,15 +193,15 @@ class MultiBeagleReader:
             print("Far Wave Angle: %r rad\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
-            for j in range(len(buf)):
-                if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
-                    lr = MIC_IND_LR[j]
-                    print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
-                    r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
-                    arr_id = db.create_array(
-                        exp_id, i, self.readers[i].x, self.readers[i].y, r, farwave_ang #theta + ANGLE_OFFSET[j]
-                    )
-                    break
+            #for j in range(len(buf)):
+            #    if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
+            #        lr = MIC_IND_LR[j]
+            #        print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
+            #        r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
+            #        arr_id = db.create_array(
+            #            exp_id, i, self.readers[i].x, self.readers[i].y, r, farwave_ang #theta + ANGLE_OFFSET[j]
+            #        )
+            #        break
 
             # Write each mic pair to db (NB: Redundant data but small size so okay)
             for j in range(len(buf)):
@@ -249,15 +256,15 @@ def run(argv):
     src_x = float(raw_input('x: ') or '0')
     src_y = float(raw_input('y: ') or '0')
     print 'Enter array 1 position:'
-    x1 = float(raw_input('x: '))
-    y1 = float(raw_input('y: '))
+    x1 = 0#float(raw_input('x: '))
+    y1 = 0#float(raw_input('y: '))
     print 'Enter array 2 position'
-    x2 = float(raw_input('x: '))
-    y2 = float(raw_input('y: '))
+    x2 = 2#float(raw_input('x: '))
+    y2 = 0#float(raw_input('y: '))
     print 'Enter array 1 length:'
-    l1 = float(raw_input('l: '))
+    l1 = 0.3#float(raw_input('l: '))
     print 'Enter array 2 length (Same as array 1 by default):'
-    l2 = float(raw_input('l: ') or l1)
+    l2 = 0.3#float(raw_input('l: ') or l1)
     print 'Enter number of runs (Default 1)'
     runs = int((raw_input('Runs: ') or '1'))
     print 'Enter experiment descriptor (Optional)'

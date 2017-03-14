@@ -228,24 +228,33 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
 
     return idx_peak[first_peak], idx_peak_low
 
-def crop_sigs_npeaks(bufs):
+def filter_sigs(buf):
+
+    sig = median_filter(np.array(buf), window=MED_WINDOW_SIZE)
+    sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
+    sig = sig[TRUNC_WINDOW:]
+    sig_filt = sig_filt[TRUNC_WINDOW:]
+
+    print "a", sig
+    print "b", sig_filt
+
+    return sig, sig_filt
+
+def crop_sigs_npeaks(sigs, sigs_filt):
     """ Crop signals in bufs using first N peaks unioned together for all signals
     """
     pks_idx, offsets = [], []
     sigs_filt_cropped, sigs_cropped, sigs_win = [], [], []
-    sigs, sigs_filt = [], []
-    min_idx, max_idx = len(bufs[0]), 0
+    min_idx, max_idx = len(sigs[0]), 0
 
     # Iterate first to create the union of the intervals
-    for i in range(len(bufs)):
-        sig = np.array(bufs[i])
+    for i in range(len(sigs)):
+        sig = np.array(sigs[i])
+        sig_filt = np.array(sigs_filt[i])
 
+        print "1", sig
+        print "2", sig
         # Generate signals to use to find peaks
-        sig = median_filter(sig, window=MED_WINDOW_SIZE)
-        sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-        sig = sig[TRUNC_WINDOW:]
-        sig_filt = sig_filt[TRUNC_WINDOW:]
-
         idx = find_peak_window(
             sig_filt, thres=0.6, min_dist=1000, n=N_PEAKS
         )
@@ -261,7 +270,7 @@ def crop_sigs_npeaks(bufs):
         sigs.append(sig)
 
     # Now crop the union of the intervals from each signal
-    for i in range(len(bufs)):
+    for i in range(len(sigs)):
         sig_cropped, sig_filt_crop, sig_win, offset = crop_peak_window(
             sigs[i], sigs_filt[i], [min_idx, max_idx]
         )
