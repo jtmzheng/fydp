@@ -49,11 +49,11 @@ void pru_start(void)
     prussdrv_pruintc_init(&pruss_intc_initdata);
 
     // Load and execute the PRU program on the PRU
-    prussdrv_exec_program (PRU_ADC_NUM, "./pruADC.bin");
-    // We let pruADC get into a consistent state first 
+    prussdrv_exec_program (PRU_ADC_NUM, "./pruADC3.bin");
+    // We let pruADC get into a consistent state first
     usleep(100);
     prussdrv_exec_program (PRU_MEM_NUM, "./pruMem.bin");
-   
+
     printf("Running Program. Waiting for request to stop\n");
 }
 
@@ -61,7 +61,7 @@ void pru_end(void)
 {
     printf("Stopping\n");
     prussdrv_pru_send_event(ARM_PRU1_INTERRUPT);
-   
+
     // Wait for event completion from PRU, returns the PRU_EVTOUT_0 number
     int n = prussdrv_pru_wait_event (PRU_EVTOUT_0);
     printf("EBB PRU program completed, event number %d.\n", n);
