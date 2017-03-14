@@ -127,7 +127,7 @@ def generate_delay_func(f1, f2, l):
         return np.array(f)
     return delay_func
 
-def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
+def locate(f1, f2, l, r0=2.5, theta0=(np.pi/6)):
     """Locate position given relative delays f1, f2 (in # of samples)
     NB: Order of f1, f2 doesn't matter here, but determines which axis
     theta is relative to
@@ -136,11 +136,11 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     f1 = float(f1) / SAMPLING_FREQ
     f2 = float(f1) / SAMPLING_FREQ
     func = generate_delay_func(f1, f2, l)
-    r_hat, theta_hat = fsolve(func, [r0, theta0])
+    #r_hat, theta_hat = fsolve(func, [r0, theta0])
     #sol = root(func, [r0, theta0], method='lm')
-    #sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
-    #print 'Optimizer message: %s' % sol.message
-    #r_hat, theta_hat = sol.x[0], sol.x[1]
+    sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
+    print 'Optimizer message: %s' % sol.message
+    r_hat, theta_hat = sol.x[0], sol.x[1]
     return r_hat, theta_hat
 
 def calc_snr(sig):
@@ -156,10 +156,7 @@ def find_peak_window(sig_filt, thres, min_dist, n):
     """ Get peaks from filtered signal (more aggressive with higher SNR)
     """
     snr = calc_snr(sig_filt)
-    if snr > SNR_THRESH:
-        idx = get_n_peaks(sig_filt, thres=thres-0.05, min_dist=min_dist, n=n)
-    else:
-        idx = get_n_peaks(sig_filt, thres=thres, min_dist=min_dist, n=n)
+    idx = get_n_peaks(sig_filt, thres=thres, min_dist=min_dist, n=n)
     return idx
 
 def crop_peak_window(sig, sig_filt, idx):
@@ -246,9 +243,19 @@ def crop_sigs_npeaks(bufs):
         sig = sig[TRUNC_WINDOW:]
         sig_filt = sig_filt[TRUNC_WINDOW:]
 
-        idx = find_peak_window(
-            sig_filt, thres=0.6, min_dist=1000, n=N_PEAKS
-        )
+        sigs_filt.append(sig_filt)
+        sigs.append(sig)
+
+    snrs = np.array([calc_snr(s) for s in sigs_filt])
+    for i in range(len(bufs)):
+        if np.all(snrs > 20.) or snrs[i] < SNR_THRESH:
+            idx = find_peak_window(
+                sigs_filt[i], thres=0.6, min_dist=1000, n=N_PEAKS
+            )
+        else:
+            idx = find_peak_window(
+                sigs_filt[i], thres=0.55, min_dist=1000, n=N_PEAKS
+            )
 
         if np.any(idx-PEAK_WINDOW_PREFIX < 0):
             raise RuntimeError('Error invalid index in %s' % str(idx))
@@ -256,9 +263,6 @@ def crop_sigs_npeaks(bufs):
         pks_idx.append(idx)
         max_idx = max(max_idx, idx[-1])
         min_idx = min(min_idx, idx[0])
-
-        sigs_filt.append(sig_filt)
-        sigs.append(sig)
 
     # Now crop the union of the intervals from each signal
     for i in range(len(bufs)):
