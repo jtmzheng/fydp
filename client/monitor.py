@@ -84,12 +84,14 @@ class Monitor:
             for cb in self.callbacks.values():
                 print 'Calling monitor callback...'
                 ret = cb()
-                print 'Callback returned %d size retval' % len(ret)
+                print 'Callback returned %r size retval' % ret
 
             # We should close the audio stream and create
             # a new one to ensure we don't look at new data
             stream.close()
         p.terminate()
+
+        return ret
 
 
 def tmp_callback():

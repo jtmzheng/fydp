@@ -83,9 +83,9 @@ def calc_angle(delays, l):
     print 'Angles: %r\nErrors: %r\n' % ([degrees(ang) for ang in angles], errors)
 
     # Map final angle to CCW and [0, 360]
-    final_ang = degrees(combine_angles(angles, errors)) # CW
-    print 'Angle (CW): %f' % final_ang
-    final_ang = -final_ang #CW -> CCW
+    final_ang_cw = degrees(combine_angles(angles, errors)) # CW
+    print 'Angle (CW): %f' % final_ang_cw
+    final_ang = -final_ang_cw #CW -> CCW
     if final_ang < 0:
         final_ang = 360. - np.abs(final_ang)             # [-180, 180] -> [0, 360]
-    return final_ang
+    return final_ang, final_ang_cw

@@ -151,6 +151,7 @@ class MultiBeagleReader:
         exp_id = db.create_experiment(self.src_x, self.src_y, self.comment)
 
         angles = []
+        deg_angles_cw = []
         for i in range(len(bufs)):
             buf = bufs[i]
 
@@ -158,7 +159,7 @@ class MultiBeagleReader:
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
-            buf_crop, _, offsets, _ = locate.crop_sigs_npeaks(buf)
+            buf_crop, _, offsets, _, _ = locate.crop_sigs_npeaks(buf)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -181,7 +182,10 @@ class MultiBeagleReader:
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
-            farwave_ang = np.deg2rad(farwave.calc_angle(delays, self.readers[i].l))
+            farwave_ang_rad_ccw, farwave_ang_cw = farwave.calc_angle(delays, self.readers[i].l)
+            farwave_ang = np.deg2rad(farwave_ang_rad_ccw)
+            deg_angles_cw.append(farwave_ang_cw)
+
             angles.append(farwave_ang) # Store in radians
             print("Far Wave Angle: %r rad\n" % farwave_ang)
 
@@ -210,12 +214,12 @@ class MultiBeagleReader:
         pos = locate.calc_poi(
             np.array([self.readers[0].x, self.readers[0].y]),
             np.array([self.readers[1].x, self.readers[1].y]),
-            np.array([np.sin(angles[0]), np.cos(angles[0])]),
-            np.array([np.sin(angles[1]), np.cos(angles[1])])
+            np.array([-np.sin(angles[0]), np.cos(angles[0])]),
+            np.array([-np.sin(angles[1]), np.cos(angles[1])])
         )
         print 'Estimated position: %f, %f' % (pos[0], pos[1])
         db.set_pos_estimate(exp_id, pos[0], pos[1])
-        return bufs
+        return deg_angles_cw
 
 def run(argv):
     """Main entry point of client
