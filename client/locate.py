@@ -4,7 +4,6 @@ import scipy as sp
 
 from scipy.optimize import fsolve, root, least_squares
 from scipy import signal
-import time
 
 import math
 import peakutils
@@ -36,7 +35,7 @@ MAX_PEAK_DIST = 46000
 PEAK_THRESH_HIGH = 0.15
 PEAK_THRESH_LOW = 0.01
 
-def apply_butter(f1, f2, fs, sig, order=2):
+def apply_butter(f1, f2, fs, sig):
     """ Apply second order Butterworth filter to sig
     fs is sampling rate
     """
@@ -231,7 +230,6 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
 
 def filter_sigs(buf):
 
-    start_time = time.time()
     sig = median_filter(buf, window=MED_WINDOW_SIZE)
     sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
     sig = sig[TRUNC_WINDOW:]

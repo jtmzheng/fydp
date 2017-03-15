@@ -154,8 +154,6 @@ class MultiBeagleReader:
         for i in range(len(bufs)):
             buf = bufs[i]
 
-            start_time = time.time()
-
             # sqlite only supports synchronous updates
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
@@ -192,6 +190,7 @@ class MultiBeagleReader:
 
             farwave_ang = np.deg2rad(farwave.calc_angle(delays, self.readers[i].l))
             angles.append(farwave_ang) # Store in radians
+            print("Far Wave Angle: %r rad\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
@@ -221,9 +220,8 @@ class MultiBeagleReader:
             np.array([-np.sin(angles[0]), np.cos(angles[0])]),
             np.array([-np.sin(angles[1]), np.cos(angles[1])])
         )
-
+        print 'Estimated position: %f, %f' % (pos[0], pos[1])
         db.set_pos_estimate(exp_id, pos[0], pos[1])
-
         return bufs
 
 def run(argv):
