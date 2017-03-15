@@ -93,15 +93,15 @@ class GUI(threading.Thread):
 
     def runMonitor(self):
         temp = 5
-        # m = Monitor(soundThreshold, 1)
-        # m.add_callback('[MultiBeagleReader::read]', self.mbr.read)
-        # ret_angles = m.monitor()
-        # self.update_arrays(ret_angles[0], ret_angles[1])
+        m = Monitor(soundThreshold, 1)
+        m.add_callback('[MultiBeagleReader::read]', self.mbr.read)
+        ret_angles = m.monitor()
+        self.update_arrays(ret_angles[0], ret_angles[1])
 
     def run(self):
-        # self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
-        # self.br_2 = BeagleReader(DEFAULT_HOSTNAME_2, DEFAULT_PORT, x=ArrayDistance, y=0, l=0.3, samples=0)
-        # self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, "")
+        self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
+        self.br_2 = BeagleReader(DEFAULT_HOSTNAME_2, DEFAULT_PORT, x=ArrayDistance, y=0, l=0.3, samples=0)
+        self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, "")
         ######## Global tkinter things that are important
         self.top = tkinter.Tk()
         # Canvas for main Vizulization
