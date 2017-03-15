@@ -193,14 +193,12 @@ class MultiBeagleReader:
                 if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
                     lr = MIC_IND_LR[j]
                     print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
-
                     # r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     farwave_ang = np.deg2rad(
                         farwave.calc_angle(delays, self.readers[i].l, near_pair=
                             (min(j, lr[0]), max(j, lr[0])) if delays[j][lr[0]] < delays[j][lr[1]] else (min(j, lr[1]), max(j, lr[1]))
                         )
                     )
-
                     arr_id = db.create_array(
                         exp_id, i, self.readers[i].x, self.readers[i].y, 0, farwave_ang #theta + ANGLE_OFFSET[j]
                     )
@@ -226,7 +224,6 @@ class MultiBeagleReader:
             np.array([self.readers[1].x, self.readers[1].y]),
             np.dot(R, np.array([np.cos(angles[0]), np.sin(angles[0])])),
             np.dot(R, np.array([np.cos(angles[1]), np.sin(angles[1])]))
-
         )
         print 'Estimated position: %f, %f' % (pos[0], pos[1])
         db.set_pos_estimate(exp_id, pos[0], pos[1])
@@ -264,15 +261,15 @@ def run(argv):
     src_x = float(raw_input('x: ') or '0')
     src_y = float(raw_input('y: ') or '0')
     print 'Enter array 1 position:'
-    x1 = 0#float(raw_input('x: '))
-    y1 = 0#float(raw_input('y: '))
+    x1 = float(raw_input('x: '))
+    y1 = float(raw_input('y: '))
     print 'Enter array 2 position'
-    x2 = 2#float(raw_input('x: '))
-    y2 = 0#float(raw_input('y: '))
+    x2 = float(raw_input('x: '))
+    y2 = float(raw_input('y: '))
     print 'Enter array 1 length:'
-    l1 = 0.3#float(raw_input('l: '))
+    l1 = float(raw_input('l: '))
     print 'Enter array 2 length (Same as array 1 by default):'
-    l2 = 0.3#float(raw_input('l: ') or l1)
+    l2 = float(raw_input('l: ') or l1)
     print 'Enter number of runs (Default 1)'
     runs = int((raw_input('Runs: ') or '1'))
     print 'Enter experiment descriptor (Optional)'
@@ -281,12 +278,12 @@ def run(argv):
     m = Monitor(300, runs)
 
     # NB: Use same port for both hosts
-    #br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
-    #br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
+    br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
 
     # NB: Enable below to test locally with test local server(s) running
-    br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
-    br_2 = BeagleReader('localhost', 5556, x=x2, y=y2, l=l2, samples=0)
+    #br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
+    #br_2 = BeagleReader('localhost', 5556, x=x2, y=y2, l=l2, samples=0)
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
