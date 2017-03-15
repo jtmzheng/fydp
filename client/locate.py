@@ -16,13 +16,19 @@ MED_WINDOW_SIZE = 21
 WINDOW_SIZE = 5000
 
 # Butterworth filter (manually calibrated) parameters
-FREQ_1 = 262-75 #Hz
-FREQ_2 = 262+75 #Hz
+FREQ_1 = 262-75#Hz
+FREQ_2 = 262+75#Hz
+
+# Truncation window (Ignore this prefix to remove ringing from ideal bandpass filter)
+TRUNC_WINDOW = 500000
 
 # Number of peaks we want to window signal over
-N_PEAKS = 5
-PEAK_WINDOW_PREFIX = 2*36000
-PEAK_WINDOW_SUFFIX = 0*36000
+N_PEAKS = 2
+PEAK_WINDOW_PREFIX = int(2*36000)
+PEAK_WINDOW_SUFFIX = int(0.5*36000)
+
+# SNR threshold for peak finding (be more aggressive with high SNR)
+SNR_THRESH = 17.5
 
 MIN_PEAK_DIST = 26000
 MAX_PEAK_DIST = 46000
@@ -38,6 +44,28 @@ def apply_butter(f1, f2, fs, sig):
     )
     sig_butter = signal.sosfiltfilt(sos, sig)
     return sig_butter
+
+def apply_ideal_bp(f1, f2, fs, sig):
+    """ Apply an ideal bandpass filter to input
+    """
+    SIG = np.fft.rfft(sig)
+    freq = np.fft.rfftfreq(n=len(sig), d=1./fs)
+
+    SIG[freq < f1] = 0
+    SIG[freq > f2] = 0
+    sig_id = np.fft.irfft(SIG)
+
+    return sig_id
+
+def apply_ideal_lp(f, fs, sig):
+    """ Apply an ideal lowpass filter to input
+    """
+    SIG = np.fft.fftshift(np.fft.fft(sig))
+    freq = np.fft.fftshift(np.fft.fftfreq(n=len(sig), d=1./fs))
+
+    SIG[np.where(np.abs(freq) > f)] = 0
+    sig_id = np.fft.ifft(np.fft.ifftshift(SIG))
+    return sig_id
 
 def normalize_signal(sig):
     """ Normalize signal and zero-mean
@@ -58,7 +86,7 @@ def movmax(seq, window=MED_WINDOW_SIZE):
     #assert len(seq) >= window
     return pd.DataFrame(seq).rolling(min_periods=1, window=window, center=True).max().values.T[0]
 
-def median_filter(seq, window=1):
+def median_filter(seq, window=MED_WINDOW_SIZE):
     """Moving windowed median over seq of input window size
     """
     #assert len(seq) >= window
@@ -100,7 +128,7 @@ def generate_delay_func(f1, f2, l):
         return np.array(f)
     return delay_func
 
-def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
+def locate(f1, f2, l, r0=2.5, theta0=(np.pi/6)):
     """Locate position given relative delays f1, f2 (in # of samples)
     NB: Order of f1, f2 doesn't matter here, but determines which axis
     theta is relative to
@@ -109,37 +137,46 @@ def locate(f1, f2, l, r0=5, theta0=(math.pi/6)):
     f1 = float(f1) / SAMPLING_FREQ
     f2 = float(f1) / SAMPLING_FREQ
     func = generate_delay_func(f1, f2, l)
-    r_hat, theta_hat = fsolve(func, [r0, theta0])
+    #r_hat, theta_hat = fsolve(func, [r0, theta0])
     #sol = root(func, [r0, theta0], method='lm')
-    #sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
-    #print 'Optimizer message: %s' % sol.message
-    #r_hat, theta_hat = sol.x[0], sol.x[1]
+    sol = least_squares(func, x0=(r0, theta0), method='trf', bounds=([2., -np.pi/3], [10, np.pi/3]))
+    print 'Optimizer message: %s' % sol.message
+    r_hat, theta_hat = sol.x[0], sol.x[1]
     return r_hat, theta_hat
 
-def find_peak_window(sig, thres, min_dist, n, closest_to=None):
-    """ Crop `sig` around n peaks using a Butterworth filter to smooth peaks
+def calc_snr(sig):
+    """ Assuming first half of signal is noise, second half is signal
     """
-    # Butterworth filter (easier to get peaks)
-    sig = np.array(sig) # Copy so we don't modify the input when truncating
-    sig_butter = normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-    idx = get_n_peaks(sig_butter, thres=thres, min_dist=min_dist, n=n)
+    noise = sig[:len(sig)/2]
+    signal = sig[len(sig)/2:]
+    rms_noise = np.sqrt(np.average((noise)**2))
+    rms_signal = np.sqrt(np.average((signal)**2))
+    return rms_signal / rms_noise
 
-    # Window the signal
-    if closest_to is None:
-        # Find indexes for first N peaks over threshold
-        offset_low = (idx[0]-PEAK_WINDOW_PREFIX)
-        offset_high = (idx[-1]+PEAK_WINDOW_SUFFIX)
-        pk_locs = (idx[0], idx[-1])
+def find_peak_window(sig_filt, thres, min_dist, n):
+    """ Get peaks from filtered signal (more aggressive with higher SNR)
+    """
+    snr = calc_snr(sig_filt)
+    idx = get_n_peaks(sig_filt, thres=thres, min_dist=min_dist, n=n)
+    return idx
 
-    else:
-        # NB: No codepath to this yet
-        pk_locs = (find_nearest(idx,closest_to[0]), find_nearest(idx,closest_to[1]))
-        offset_low = (pk_locs[0]-PEAK_WINDOW_PREFIX)
-        offset_high = (pk_locs[-1]+PEAK_WINDOW_SUFFIX)
+def crop_peak_window(sig, sig_filt, idx):
+    sig = np.array(sig)
+    sig_filt = np.array(sig_filt)
 
-    sig_butter = sig_butter[offset_low:offset_high]
+    # Find indexes for first N peaks over threshold
+    offset_low = int(idx[0]-PEAK_WINDOW_PREFIX)
+    offset_high = int(idx[-1]+PEAK_WINDOW_SUFFIX)
+
+    # Return windowed sig for debugging
+    sig_win = np.array(sig)
+    sig_win[:offset_low] = 0
+    sig_win[offset_high:] = 0
+
+    sig_filt = sig_filt[offset_low:offset_high]
     sig = sig[offset_low:offset_high]
-    return sig, sig_butter, offset_low, pk_locs
+
+    return sig, sig_filt, sig_win, offset_low
 
 def calc_max_delay(l):
     """ Compute the max delay possible given microphone center distance l
@@ -189,48 +226,97 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
 
     return idx_peak[first_peak], idx_peak_low
 
-def crop_sigs(bufs):
+def preprocess_sig(buf):
+    """ Performs median filter and ideal bandpass filter + normalization on signal
+    Also does a truncation.
+    """
+    sig = median_filter(buf, window=MED_WINDOW_SIZE)
+    sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
+    sig = sig[TRUNC_WINDOW:]
+    sig_filt = sig_filt[TRUNC_WINDOW:]
+
+    return sig, sig_filt
+
+def crop_sigs_npeaks(sigs, sigs_filt):
+    """ Crop signals in bufs using first N peaks unioned together for all signals
+    """
+    pks_idx, offsets = [], []
+    sigs_filt_cropped, sigs_cropped, sigs_win = [], [], []
+    min_idx, max_idx = len(sigs[0]), 0
+
+    # Iterate first to create the union of the intervals
+    snrs = np.array([calc_snr(s) for s in sigs_filt])
+    for i in range(len(sigs)):
+        if np.all(snrs > 20.) or snrs[i] < SNR_THRESH:
+            idx = find_peak_window(
+                sigs_filt[i], thres=0.6, min_dist=1000, n=N_PEAKS
+            )
+        else:
+            idx = find_peak_window(
+                sigs_filt[i], thres=0.55, min_dist=1000, n=N_PEAKS
+            )
+
+        if np.any(idx-PEAK_WINDOW_PREFIX < 0):
+            raise RuntimeError('Error invalid index in %s' % str(idx))
+
+        pks_idx.append(idx)
+        max_idx = max(max_idx, idx[-1])
+        min_idx = min(min_idx, idx[0])
+
+    # Now crop the union of the intervals from each signal
+    for i in range(len(sigs)):
+        sig_cropped, sig_filt_crop, sig_win, offset = crop_peak_window(
+            sigs[i], sigs_filt[i], [min_idx, max_idx]
+        )
+
+        sigs_filt_cropped.append(sig_filt_crop)
+        sigs_cropped.append(sig_cropped)
+        sigs_win.append(sig_win)
+        offsets.append(offset)
+
+    return sigs_cropped, sigs_filt_cropped, np.array(offsets), sigs_win, pks_idx
+
+def crop_sigs_rising_edge(bufs):
     """ Given N signals, crop all N at the "first peak" detected for all signals
-    This is done by finding the "first peak" for each signal.
-    The "reference peak" is the earliest "first peak"
-    Then, we crop each signal at their respective peaks that is closest to the
-    reference peak
+    -   This is done by finding the "first peak" for each signal.
+    -   The "reference peak" is the earliest "first peak"
+    -   Then, we crop each signal at their respective peaks that is closest to the
+        reference peak
     """
     pks = []
     locations = []
-    """
-    sigs_butter_cropped, sigs_cropped = [], []
-    offsets = []
-
-    for i in range(len(bufs)):
-        sig_cropped, sig_butter, offset, _ = find_peak_window(bufs[i], thres=0.6, min_dist=1000, n=N_PEAKS)
-        sigs_butter_cropped.append(sig_butter)
-        sigs_cropped.append(sig_cropped)
-        offsets.append(offset)
-    """
-
     sigs_butter, sigs = [], []
     for i in range(len(bufs)):
         sigs.append(np.array(bufs[i]))
-        sigs_butter.append(normalize_signal(apply_butter(FREQ_1, FREQ_2, SAMPLING_FREQ, sigs[i])))
+        sigs_butter.append(normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sigs[i])))
         pk, locs = find_first_peak(sigs_butter[i], PEAK_THRESH_HIGH, PEAK_THRESH_LOW)
         pks.append(pk)
         locations.append(locs)
 
     pk_ref = np.nanmin(pks)
     if np.isnan(pk_ref):
-        raise RuntimeError("Could not find a reference peak")
+        raise RuntimeError('Could not find a reference peak')
 
     offsets = []
-    sigs_cropped, sigs_butter_cropped = [], []
+    sigs_cropped, sigs_butter_cropped, sigs_win = [], [], []
     for i in range(len(bufs)):
         pk_ref_i = find_nearest(locations[i], pk_ref)
         offset_i = (pk_ref_i-PEAK_WINDOW_PREFIX)
+        if offset_i < 0:
+            raise RuntimeError('Error invalid index in %s' % str(offset_i))
+
         offsets.append(pk_ref_i)
         sigs_butter_cropped.append(sigs_butter[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
         sigs_cropped.append(sigs[i][offset_i:pk_ref_i+PEAK_WINDOW_SUFFIX])
 
-    return sigs_cropped, sigs_butter_cropped, offsets
+        # Return windowed sig for debugging
+        sig_win = np.array(sigs[i])
+        sig_win[:offset_i] = 0
+        sig_win[pk_ref_i+PEAK_WINDOW_SUFFIX:] = 0
+        sigs_win.append(sig_win)
+
+    return sigs_cropped, sigs_butter_cropped, offsets, sigs_win, []
+
 
 def xcorr(sig1, sig2):
     """ Cross-correlation (NB: http://stackoverflow.com/questions/12323959/fast-cross-correlation-method-in-python)
@@ -265,16 +351,16 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
 
-    SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
-    SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=Nfft, d=1./fs))
+    SIG1 = np.fft.rfft(sig1, n=Nfft)
+    SIG2 = np.fft.rfft(sig2, n=Nfft)
+    freq = np.fft.rfftfreq(n=Nfft, d=1./fs)
 
     CORR = np.multiply(SIG1, np.conj(SIG2))
-    CORR[np.where(np.abs(freq) < fmin)] = 0 # window in frequency domain
-    CORR[np.where(np.abs(freq) > fmax)] = 0
+    CORR[freq < fmin] = 0 # window in frequency domain
+    CORR[freq > fmax] = 0
 
     CORR = CORR / (np.abs(SIG1) * np.abs(np.conj(SIG2)))
-    corr = np.fft.ifft(np.fft.ifftshift(CORR))
+    corr = np.fft.irfft(CORR)
     corr = np.fft.fftshift(corr)
 
     # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within
