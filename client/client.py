@@ -154,18 +154,21 @@ class MultiBeagleReader:
         for i in range(len(bufs)):
             buf = bufs[i]
 
+            start_time = time.time()
+
             # sqlite only supports synchronous updates
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # apply median and ideal bp in parallel
-            results = [pool.apply_async(locate.filter_sigs, args=(buf_i)) for buf_i in buf]
+            results = [pool.apply_async(locate.filter_sigs, args=(buf_i,)) for buf_i in buf]
             sigs, sigs_filt = [], []
-            for j in range(len(buf)):
+            for res in results:
                 sigs.append(res.get(timeout=self.timeout)[0])
                 sigs_filt.append(res.get(timeout=self.timeout)[1])
 
-            buf_crop, _, offsets, _ = locate.crop_sigs_npeaks(sigs, sigs_filt)
+            buf_crop, _, offsets, _, _ = locate.crop_sigs_npeaks(sigs, sigs_filt)
+
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -175,7 +178,6 @@ class MultiBeagleReader:
                         results.append((
                             (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf_crop[j], buf_crop[k], offsets[j], offsets[k], self.readers[i].l))
                         ))
-
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
             delays = np.zeros((len(buf), len(buf)), dtype=np.float)
@@ -190,18 +192,17 @@ class MultiBeagleReader:
 
             farwave_ang = np.deg2rad(farwave.calc_angle(delays, self.readers[i].l))
             angles.append(farwave_ang) # Store in radians
-            print("Far Wave Angle: %r rad\n" % farwave_ang)
 
             # Estimate "location" of sound source, create array record
-            #for j in range(len(buf)):
-            #    if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
-            #        lr = MIC_IND_LR[j]
-            #        print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
-            #        r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
-            #        arr_id = db.create_array(
-            #            exp_id, i, self.readers[i].x, self.readers[i].y, r, farwave_ang #theta + ANGLE_OFFSET[j]
-            #        )
-            #        break
+            for j in range(len(buf)):
+                if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
+                    lr = MIC_IND_LR[j]
+                    print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
+                    r, theta = (0,0) #locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
+                    arr_id = db.create_array(
+                        exp_id, i, self.readers[i].x, self.readers[i].y, r, farwave_ang #theta + ANGLE_OFFSET[j]
+                    )
+                    break
 
             # Write each mic pair to db (NB: Redundant data but small size so okay)
             for j in range(len(buf)):
@@ -217,11 +218,12 @@ class MultiBeagleReader:
         pos = locate.calc_poi(
             np.array([self.readers[0].x, self.readers[0].y]),
             np.array([self.readers[1].x, self.readers[1].y]),
-            np.array([np.sin(angles[0]), np.cos(angles[0])]),
-            np.array([np.sin(angles[1]), np.cos(angles[1])])
+            np.array([-np.sin(angles[0]), np.cos(angles[0])]),
+            np.array([-np.sin(angles[1]), np.cos(angles[1])])
         )
-        print 'Estimated position: %f, %f' % (pos[0], pos[1])
+
         db.set_pos_estimate(exp_id, pos[0], pos[1])
+
         return bufs
 
 def run(argv):
@@ -273,12 +275,12 @@ def run(argv):
     m = Monitor(300, runs)
 
     # NB: Use same port for both hosts
-    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
-    br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
+    #br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
+    #br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
 
     # NB: Enable below to test locally with test local server(s) running
-    #br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
-    #br_2 = BeagleReader('localhost', 5556, x=x2, y=y2, l=l2, samples=0)
+    br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
+    br_2 = BeagleReader('localhost', 5556, x=x2, y=y2, l=l2, samples=0)
 
     # NB: We want the whatever reader/consumer to write out structured data
     # to persistent storage (ie with metadata, raw data, analysis, etc)
