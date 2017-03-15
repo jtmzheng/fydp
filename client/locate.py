@@ -226,8 +226,9 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
 
     return idx_peak[first_peak], idx_peak_low
 
-def filter_sigs(buf):
-    """ Performs median filter and ideal bandpass filter on signal
+def preprocess_sig(buf):
+    """ Performs median filter and ideal bandpass filter + normalization on signal
+    Also does a truncation.
     """
     sig = median_filter(buf, window=MED_WINDOW_SIZE)
     sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))

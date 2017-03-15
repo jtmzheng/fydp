@@ -159,7 +159,7 @@ class MultiBeagleReader:
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
             # apply median and ideal bp in parallel
-            results = [pool.apply_async(locate.filter_sigs, args=(buf_i,)) for buf_i in buf]
+            results = [pool.apply_async(locate.preprocess_sig, args=(buf_i,)) for buf_i in buf]
             sigs, sigs_filt = [], []
             for res in results:
                 sigs.append(res.get(timeout=self.timeout)[0])
