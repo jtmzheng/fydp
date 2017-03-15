@@ -4,10 +4,18 @@ import locate
 
 from enum import Enum
 
+SENSITIVITY_THRESH = 0.20
+
 class MIC_PAIRS(Enum):
-    MIC0_1 = 1
-    MIC2_0 = 2
-    MIC1_2 = 3
+    MIC0_1 = 0
+    MIC2_0 = 1
+    MIC1_2 = 2
+
+MIC_PAIRS_TO_ENUM = {
+    (0, 1): MIC_PAIRS.MIC0_1,
+    (0, 2): MIC_PAIRS.MIC2_0,
+    (1, 2): MIC_PAIRS.MIC1_2
+}
 
 def wrap_angle(angle):
     """ Wrap angle in [-pi, pi] radians
@@ -40,16 +48,14 @@ def calc_far_wave_angle(delays, max_delay, pair_num):
     if pair_num == MIC_PAIRS.MIC0_1:
         delay = delays[0][1]
         pos_ang = np.mean((delays[2][1], delays[2][0])) > 0
-
     elif pair_num == MIC_PAIRS.MIC2_0:
         delay = delays[2][0]
         pos_ang = np.mean((delays[1][0], delays[1][2])) > 0
-
     else: # pair_num == MIC_PAIRS.MIC1_2:
         delay = delays[1][2]
         pos_ang = np.mean((delays[0][1], delays[0][2])) > 0
 
-    normalized_delay = float(delay)/abs(max_delay)
+    normalized_delay = float(delay) / abs(max_delay)
     ang_raw = acos(normalized_delay)
 
     # Derivative of acos used to quantify sensitivity of far wave
@@ -59,16 +65,22 @@ def calc_far_wave_angle(delays, max_delay, pair_num):
 
     if pair_num == MIC_PAIRS.MIC0_1:
         ang = wrap_angle(ang_raw + np.pi/6)
-
     elif pair_num == MIC_PAIRS.MIC2_0:
         ang = wrap_angle(ang_raw + 5*np.pi/6)
-
     else: # pair_num == MIC_PAIRS.MIC1_2:
         ang = wrap_angle(ang_raw - np.pi/2)
 
     return (ang, error_est)
 
-def calc_angle(delays, l):
+def map_ccw(ang):
+    """ Map the angle from CW to CCW and from [-180, 180] to [0, 360]
+    """
+    ang = -ang                                  # CW -> CCW
+    if ang < 0:
+        ang = 360. - np.abs(ang)    # [-180, 180] -> [0, 360]
+    return ang
+
+def calc_angle(delays, l, near_pair=None):
     """ FIXME
     """
     angles = []
@@ -80,12 +92,26 @@ def calc_angle(delays, l):
         angles.append(far_ang[0])
         errors.append(far_ang[1])
 
-    print 'Angles: %r\nErrors: %r\n' % ([degrees(ang) for ang in angles], errors)
+    print 'Angles: %r\nErrors: %r\n' % ([map_ccw(degrees(ang)) for ang in angles], errors)
 
     # Map final angle to CCW and [0, 360]
-    final_ang = degrees(combine_angles(angles, errors)) # CW
-    print 'Angle (CW): %f' % final_ang
-    final_ang = -final_ang #CW -> CCW
-    if final_ang < 0:
-        final_ang = 360. - np.abs(final_ang)             # [-180, 180] -> [0, 360]
+    final_ang = map_ccw(degrees(combine_angles(angles, errors)))
+
+    if near_pair is None:
+        print 'Angle (CCW): %f' % final_ang
+        return final_ang
+
+    min_err = np.min(np.abs(errors))
+    for i in range(len(errors)):
+        for j in range(i + 1, len(errors)):
+            print 'DEL_ERR: %f' % np.abs(errors[i] - errors[j])
+            print 'Error: %f, %f, %r' % (np.abs(errors[i] - errors[j]), min_err, str(np.isclose(min_err, min(errors[i], errors[j]))))
+            if (np.abs(errors[i] - errors[j]) < SENSITIVITY_THRESH and
+                np.isclose(min(errors[i], errors[j]), min_err)):
+                final_ang = map_ccw(degrees(angles[MIC_PAIRS_TO_ENUM[near_pair].value]))
+                print 'Setting final_ang to %f' % final_ang
+                break
+
+    print 'Angle (CCW): %f' % final_ang
     return final_ang
+
