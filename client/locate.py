@@ -48,12 +48,13 @@ def apply_butter(f1, f2, fs, sig):
 def apply_ideal_bp(f1, f2, fs, sig):
     """ Apply an ideal bandpass filter to input
     """
-    SIG = np.fft.fftshift(np.fft.fft(sig))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=len(sig), d=1./fs))
+    SIG = np.fft.rfft(sig)
+    freq = np.fft.rfftfreq(n=len(sig), d=1./fs)
 
-    SIG[np.where(np.abs(freq) < f1)] = 0
-    SIG[np.where(np.abs(freq) > f2)] = 0
-    sig_id = np.fft.ifft(np.fft.ifftshift(SIG))
+    SIG[freq < f1] = 0
+    SIG[freq > f2] = 0
+    sig_id = np.fft.irfft(SIG)
+
     return sig_id
 
 def apply_ideal_lp(f, fs, sig):
@@ -225,29 +226,27 @@ def find_first_peak(sig, peak_thresh_high, peak_thresh_low):
 
     return idx_peak[first_peak], idx_peak_low
 
-def crop_sigs_npeaks(bufs):
+def preprocess_sig(buf):
+    """ Performs median filter and ideal bandpass filter + normalization on signal
+    Also does a truncation.
+    """
+    sig = median_filter(buf, window=MED_WINDOW_SIZE)
+    sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
+    sig = sig[TRUNC_WINDOW:]
+    sig_filt = sig_filt[TRUNC_WINDOW:]
+
+    return sig, sig_filt
+
+def crop_sigs_npeaks(sigs, sigs_filt):
     """ Crop signals in bufs using first N peaks unioned together for all signals
     """
     pks_idx, offsets = [], []
     sigs_filt_cropped, sigs_cropped, sigs_win = [], [], []
-    sigs, sigs_filt = [], []
-    min_idx, max_idx = len(bufs[0]), 0
+    min_idx, max_idx = len(sigs[0]), 0
 
     # Iterate first to create the union of the intervals
-    for i in range(len(bufs)):
-        sig = np.array(bufs[i])
-
-        # Generate signals to use to find peaks
-        sig = median_filter(sig, window=MED_WINDOW_SIZE)
-        sig_filt = normalize_signal(apply_ideal_bp(FREQ_1, FREQ_2, SAMPLING_FREQ, sig))
-        sig = sig[TRUNC_WINDOW:]
-        sig_filt = sig_filt[TRUNC_WINDOW:]
-
-        sigs_filt.append(sig_filt)
-        sigs.append(sig)
-
     snrs = np.array([calc_snr(s) for s in sigs_filt])
-    for i in range(len(bufs)):
+    for i in range(len(sigs)):
         if np.all(snrs > 20.) or snrs[i] < SNR_THRESH:
             idx = find_peak_window(
                 sigs_filt[i], thres=0.6, min_dist=1000, n=N_PEAKS
@@ -265,7 +264,7 @@ def crop_sigs_npeaks(bufs):
         min_idx = min(min_idx, idx[0])
 
     # Now crop the union of the intervals from each signal
-    for i in range(len(bufs)):
+    for i in range(len(sigs)):
         sig_cropped, sig_filt_crop, sig_win, offset = crop_peak_window(
             sigs[i], sigs_filt[i], [min_idx, max_idx]
         )
@@ -352,16 +351,16 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
 
-    SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
-    SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=Nfft, d=1./fs))
+    SIG1 = np.fft.rfft(sig1, n=Nfft)
+    SIG2 = np.fft.rfft(sig2, n=Nfft)
+    freq = np.fft.rfftfreq(n=Nfft, d=1./fs)
 
     CORR = np.multiply(SIG1, np.conj(SIG2))
-    CORR[np.where(np.abs(freq) < fmin)] = 0 # window in frequency domain
-    CORR[np.where(np.abs(freq) > fmax)] = 0
+    CORR[freq < fmin] = 0 # window in frequency domain
+    CORR[freq > fmax] = 0
 
     CORR = CORR / (np.abs(SIG1) * np.abs(np.conj(SIG2)))
-    corr = np.fft.ifft(np.fft.ifftshift(CORR))
+    corr = np.fft.irfft(CORR)
     corr = np.fft.fftshift(corr)
 
     # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within

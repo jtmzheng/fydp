@@ -158,7 +158,15 @@ class MultiBeagleReader:
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
-            buf_crop, _, offsets, _, _ = locate.crop_sigs_npeaks(buf)
+            # apply median and ideal bp in parallel
+            results = [pool.apply_async(locate.preprocess_sig, args=(buf_i,)) for buf_i in buf]
+            sigs, sigs_filt = [], []
+            for res in results:
+                sigs.append(res.get(timeout=self.timeout)[0])
+                sigs_filt.append(res.get(timeout=self.timeout)[1])
+
+            buf_crop, _, offsets, _, _ = locate.crop_sigs_npeaks(sigs, sigs_filt)
+
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -168,7 +176,6 @@ class MultiBeagleReader:
                         results.append((
                             (j, k), pool.apply_async(locate.xcorr_peaks, args=(buf_crop[j], buf_crop[k], offsets[j], offsets[k], self.readers[i].l))
                         ))
-
 
             # 3x3 array delays[i][j] is the delay of signal j relative to signal i
             delays = np.zeros((len(buf), len(buf)), dtype=np.float)
