@@ -1,20 +1,19 @@
 import time
 import sys
 
-import tkinter
-from tkinter import *
+import Tkinter
+from Tkinter import *
 import math
 import threading
 
-# from  client import *
-# from  monitor import *
+from  client import *
+from  monitor import *
 
 from PIL import Image, ImageTk
 
 MAX_CHUNK_SIZE = 4096
 DEFAULT_HOSTNAME = '192.168.7.2'
 DEFAULT_HOSTNAME_2 = '192.168.8.2'
-#DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
 
 soundThreshold = 300;
@@ -65,11 +64,11 @@ class GUI(threading.Thread):
         self.C.delete('line')
         # Mic 0 Line
         micCoord0 = baseWidth0, baseHeight0, baseWidth0 + radius * math.sin(math.radians(A0)), baseHeight0 - radius * math.cos(math.radians(A0))
-        line0 = self.C.create_line(micCoord0, fill="#FFE800", width = 5, arrow = tkinter.LAST, smooth = TRUE, tag='line')
+        line0 = self.C.create_line(micCoord0, fill="#FFE800", width = 5, arrow = Tkinter.LAST, smooth = TRUE, tag='line')
         if numMics == 2:
             # Mic 1 Line
             micCoord1 =    baseWidth1, baseHeight1, baseWidth1 + radius * math.sin(math.radians(A1)), baseHeight1 - radius * math.cos(math.radians(A1))
-            line1 = self.C.create_line(micCoord1, fill="#FFE800", width = 5, arrow = tkinter.LAST, smooth = TRUE, tag='line')
+            line1 = self.C.create_line(micCoord1, fill="#FFE800", width = 5, arrow = Tkinter.LAST, smooth = TRUE, tag='line')
 
     def update_arrays(self, A0, A1):
         global numMics
@@ -92,33 +91,41 @@ class GUI(threading.Thread):
         self.top.quit()
 
     def runMonitor(self):
-        temp = 5
-        m = Monitor(soundThreshold, 1)
-        m.add_callback('[MultiBeagleReader::read]', self.mbr.read)
-        ret_angles = m.monitor()
-        self.update_arrays(ret_angles[0], ret_angles[1])
+
+        for i in range(int(self.NumRunEntry.get())):
+            m = Monitor(soundThreshold, 1)
+            m.add_callback('[MultiBeagleReader::read]', self.mbr.read)
+            ret_angles = m.monitor()
+            self.update_arrays(360-math.degrees(ret_angles[0]), 360-math.degrees(ret_angles[1]))
+            self.top.update_idletasks()
+            self.top.update()
 
     def run(self):
         self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
         self.br_2 = BeagleReader(DEFAULT_HOSTNAME_2, DEFAULT_PORT, x=ArrayDistance, y=0, l=0.3, samples=0)
+
+        #For Linux testing
+        #self.br_1 = BeagleReader('localhost', 5555, x=0, y=0, l=0.3, samples=0)
+        #self.br_2 = BeagleReader('localhost', 5556, x=ArrayDistance, y=0, l=0.3, samples=0)
+
         self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, "")
-        ######## Global tkinter things that are important
-        self.top = tkinter.Tk()
+        ######## Global Tkinter things that are important
+        self.top = Tkinter.Tk()
         # Canvas for main Vizulization
-        self.C = tkinter.Canvas(self.top, bg="#7373D9"  , height=height, width=width)
+        self.C = Tkinter.Canvas(self.top, bg="#7373D9"  , height=height, width=width)
         # Mic 0 Line
         micCoord0 =    baseWidth0, baseHeight0, baseWidth0 + radius * math.sin(math.radians(angle0)), baseHeight0 - radius * math.cos(math.radians(angle0))
-        line0 = self.C.create_line(micCoord0, fill="#FFE800", width = 5, arrow = tkinter.LAST, smooth = TRUE, tag='line')
+        line0 = self.C.create_line(micCoord0, fill="#FFE800", width = 5, arrow = Tkinter.LAST, smooth = TRUE, tag='line')
 
         # Mic 1 Line
         micCoord1 =    baseWidth1, baseHeight1, baseWidth1 + radius * math.sin(math.radians(angle1)), baseHeight1 - radius * math.cos(math.radians(angle1))
-        line1 = self.C.create_line(micCoord1, fill="#FFE800", width = 5, arrow = tkinter.LAST, smooth = TRUE, tag='line')
+        line1 = self.C.create_line(micCoord1, fill="#FFE800", width = 5, arrow = Tkinter.LAST, smooth = TRUE, tag='line')
 
         micIcon = ImageTk.PhotoImage(image)
         A0 = self.C.create_image((baseWidth0, baseHeight0), image = micIcon,tag='mic')
         A1 = self.C.create_image((baseWidth1, baseHeight1), image = micIcon,tag='mic')
 
-        example = tkinter.Label(self.top, text="Sonotrack Viz", font="Arial", width = 20, bg = "#090974", foreground = "#FFE800")
+        example = Tkinter.Label(self.top, text="Sonotrack Viz", font="Arial", width = 20, bg = "#090974", foreground = "#FFE800")
         example.place(relx=0.5, rely=0.1, anchor="c", )
 
         # Create the grid
@@ -139,31 +146,28 @@ class GUI(threading.Thread):
         MyButton3 = Button(self.top, text="Quit", width=10, command=self.callback,bg = "white")
         MyButton3.place(relx=0.75, rely=0.95, anchor="c")
 
-        self.DistanceEntry = tkinter.Entry(self.top,  width = 8)
+        self.DistanceEntry = Tkinter.Entry(self.top,  width = 8)
         self.DistanceEntry.insert(END, '2')
         self.DistanceEntry.place(x=height/4, y=height/10*8.5, anchor="c")
 
-        DistanceText = tkinter.Label(self.top, text="Array Distance", font="Arial", background = "#090974", fg = "white", height = 1)
+        DistanceText = Tkinter.Label(self.top, text="Array Distance", font="Arial", background = "#090974", fg = "white", height = 1)
         DistanceText.place(x=height/4, y=height/5 *4, anchor="c")
 
-        self.NumArrayEntry = tkinter.Entry(self.top, width = 8)
+        self.NumArrayEntry = Tkinter.Entry(self.top, width = 8)
         self.NumArrayEntry.insert(END, '2')
         self.NumArrayEntry.place(x=height/5*2.5, y=height/10*8.5, anchor="c")
 
-        NumArrayText = tkinter.Label(self.top, text="# Of Arrays", font="Arial", background = "#090974", fg = "white", height = 1)
+        NumArrayText = Tkinter.Label(self.top, text="# Of Arrays", font="Arial", background = "#090974", fg = "white", height = 1)
         NumArrayText.place(x=height/2, y=height/5 *4, anchor="c")
 
-        self.NumRunEntry = tkinter.Entry(self.top, width = 8)
+        self.NumRunEntry = Tkinter.Entry(self.top, width = 8)
         self.NumRunEntry.insert(END, '2')
         self.NumRunEntry.place(x=height/4*3, y=height/10*8.5, anchor="c")
 
-        NumRunText = tkinter.Label(self.top, text="# of Runs", font="Arial", background = "#090974", fg = "white", height = 1)
+        NumRunText = Tkinter.Label(self.top, text="# of Runs", font="Arial", background = "#090974", fg = "white", height = 1)
         NumRunText.place(x=height/4*3, y=height/5 *4, anchor="c")
 
         self.top.mainloop()
-
-        def get_update(self, A0, A1):
-            temp = 5
 
 
 gui = GUI()
