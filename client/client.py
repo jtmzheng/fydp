@@ -158,7 +158,7 @@ class MultiBeagleReader:
             for j in range(len(buf)):
                 mic_id = db.create_mic(exp_id, i, mic_id=j, data=buf[j])
 
-            buf_crop, _, offsets, _, _ = locate.crop_sigs_npeaks(buf)
+            buf_crop, _, offsets = locate.crop_sigs(buf)
             # Asynchronously calculate xcorr for each mic to baseline mic
             results = []
             for j in range(len(buf)):
@@ -181,22 +181,19 @@ class MultiBeagleReader:
             print delays
             assert len(buf) == 3 # We make some assumptions here that len(buf) == 3
 
+            farwave_ang = farwave.calc_angle(delays, self.readers[i].l)
+            angles.append(np.rad2deg(farwave_ang))
+            print("Far Wave Angle: %r\n" % farwave_ang)
+
             # Estimate "location" of sound source, create array record
             for j in range(len(buf)):
                 if delays[j][(j+1)%3] >= 0 and delays[j][(j+2)%3] >= 0:
                     lr = MIC_IND_LR[j]
                     print 'Using microphone %d as closest mic - (%d left, %d right)\n' % (j, lr[0], lr[1])
-                    # r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
-                    farwave_ang = np.deg2rad(
-                        farwave.calc_angle(delays, self.readers[i].l, near_pair=
-                            (min(j, lr[0]), max(j, lr[0])) if delays[j][lr[0]] < delays[j][lr[1]] else (min(j, lr[1]), max(j, lr[1]))
-                        )
-                    )
+                    r, theta = locate.locate(delays[j][lr[0]], delays[j][lr[1]], self.readers[i].l)
                     arr_id = db.create_array(
-                        exp_id, i, self.readers[i].x, self.readers[i].y, 0, farwave_ang #theta + ANGLE_OFFSET[j]
+                        exp_id, i, self.readers[i].x, self.readers[i].y, r, theta + ANGLE_OFFSET[j]
                     )
-                    angles.append(farwave_ang) # Store in radians
-                    print("Far Wave Angle: %r rad\n" % farwave_ang)
                     break
 
             # Write each mic pair to db (NB: Redundant data but small size so okay)
@@ -210,13 +207,11 @@ class MultiBeagleReader:
 
         # Calc estimated position and store in db
         assert len(bufs) == 2
-        R = np.array([[0, -1], [1, 0]]) # Rotate 90 degrees CCW
-
         pos = locate.calc_poi(
             np.array([self.readers[0].x, self.readers[0].y]),
             np.array([self.readers[1].x, self.readers[1].y]),
-            np.dot(R, np.array([np.cos(angles[0]), np.sin(angles[0])])),
-            np.dot(R, np.array([np.cos(angles[1]), np.sin(angles[1])]))
+            np.array([np.sin(angles[0]), np.cos(angles[0])]),
+            np.array([np.sin(angles[1]), np.cos(angles[1])])
         )
         print 'Estimated position: %f, %f' % (pos[0], pos[1])
         db.set_pos_estimate(exp_id, pos[0], pos[1])
