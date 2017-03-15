@@ -48,12 +48,13 @@ def apply_butter(f1, f2, fs, sig):
 def apply_ideal_bp(f1, f2, fs, sig):
     """ Apply an ideal bandpass filter to input
     """
-    SIG = np.fft.fftshift(np.fft.fft(sig))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=len(sig), d=1./fs))
+    SIG = np.fft.rfft(sig)
+    freq = np.fft.rfftfreq(n=len(sig), d=1./fs)
 
-    SIG[np.where(np.abs(freq) < f1)] = 0
-    SIG[np.where(np.abs(freq) > f2)] = 0
-    sig_id = np.fft.ifft(np.fft.ifftshift(SIG))
+    SIG[freq < f1] = 0
+    SIG[freq > f2] = 0
+    sig_id = np.fft.irfft(SIG)
+
     return sig_id
 
 def apply_ideal_lp(f, fs, sig):
@@ -352,16 +353,16 @@ def gcc_xcorr(sig1, sig2, max_delay, offset, fmin, fmax, fs):
     """
     Nfft = int(next_pow_2(len(sig1) + len(sig2) - 1))
 
-    SIG1 = np.fft.fftshift(np.fft.fft(sig1, n=Nfft))
-    SIG2 = np.fft.fftshift(np.fft.fft(sig2, n=Nfft))
-    freq = np.fft.fftshift(np.fft.fftfreq(n=Nfft, d=1./fs))
+    SIG1 = np.fft.rfft(sig1, n=Nfft)
+    SIG2 = np.fft.rfft(sig2, n=Nfft)
+    freq = np.fft.rfftfreq(n=Nfft, d=1./fs)
 
     CORR = np.multiply(SIG1, np.conj(SIG2))
-    CORR[np.where(np.abs(freq) < fmin)] = 0 # window in frequency domain
-    CORR[np.where(np.abs(freq) > fmax)] = 0
+    CORR[freq < fmin] = 0 # window in frequency domain
+    CORR[freq > fmax] = 0
 
     CORR = CORR / (np.abs(SIG1) * np.abs(np.conj(SIG2)))
-    corr = np.fft.ifft(np.fft.ifftshift(CORR))
+    corr = np.fft.irfft(CORR)
     corr = np.fft.fftshift(corr)
 
     # Crop out anything > MAX_DELAY (This is a kludge to ensure max correlation is within
