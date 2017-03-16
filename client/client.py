@@ -227,7 +227,7 @@ class MultiBeagleReader:
         )
         print 'Estimated position: %f, %f' % (pos[0], pos[1])
         db.set_pos_estimate(exp_id, pos[0], pos[1])
-        return bufs
+        return angles
 
 def run(argv):
     """Main entry point of client
