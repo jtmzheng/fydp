@@ -78,9 +78,9 @@ class GUI(threading.Thread):
             self.C.coords(self.Array1, A1C)
 
     def draw_lines(self):
-        if self.line_0 != None:
+        if self.line_0 != None and self.cur_mic_0 != None:
             self.prev_mic_0.append(self.cur_mic_0)
-        if self.line_1 != None:
+        if self.line_1 != None and self.cur_mic_1 != None:
             self.prev_mic_1.append(self.cur_mic_1)
 
         self.C.delete('line')
@@ -134,11 +134,17 @@ class GUI(threading.Thread):
         num_mics = int(self.NumArrayEntry.get())
         array_dist = int(self.DistanceEntry.get())
 
+        self.cur_mic_0 = None
+        self.cur_mic_1 = None
+        self.line_0 = None
+        self.line_1 = None
+
         if num_mics == 1:
             baseWidth0 = WINDOW_WIDTH/2
         elif num_mics == 2:
             baseWidth0 = WINDOW_WIDTH/2 - TND * array_dist / 2
             baseWidth1 = WINDOW_WIDTH/2 + TND * array_dist / 2
+
         self.draw_mics()
         self.draw_lines()
         self.C.pack()
@@ -163,7 +169,7 @@ class GUI(threading.Thread):
         self.br_1 = BeagleReader('localhost', 5555, x=0, y=0, l=0.3, samples=0)
         self.br_2 = BeagleReader('localhost', 5556, x=array_dist, y=0, l=0.3, samples=0)
 
-        self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, '')
+        self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, 'Testing GUI')
 
         ######## Global Tkinter things that are important
         self.top = Tkinter.Tk()
