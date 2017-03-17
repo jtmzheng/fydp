@@ -6,8 +6,10 @@ from Tkinter import *
 import math
 import threading
 
-from  client import *
-from  monitor import *
+from client import *
+from monitor import *
+
+import db
 
 from PIL import Image, ImageTk
 
@@ -152,14 +154,21 @@ class GUI(threading.Thread):
     def callback(self):
         self.top.quit()
 
-    def runMonitor(self):
-        for i in range(int(self.NumRunEntry.get())):
-            m = Monitor(SOUND_THRESHOLD, 1)
-            m.add_callback('[MultiBeagleReader::read]', self.mbr.read)
-            ret_angles = m.monitor()
-            self.update_arrays(360-math.degrees(ret_angles[0]), 360-math.degrees(ret_angles[1]))
-            self.top.update_idletasks()
-            self.top.update()
+    def mb_callback(self):
+        angle = self.mbr.read()
+        self.update_arrays(360-math.degrees(angle[0]), 360-math.degrees(angle[1]))
+        self.top.update_idletasks()
+        self.top.update()
+
+    def run_monitor(self):
+        def worker():
+            m = Monitor(SOUND_THRESHOLD, int(self.NumRunEntry.get()))
+            m.add_callback('[MultiBeagleReader::read]', self.mb_callback)
+            m.monitor()
+
+        t = threading.Thread(target=worker)
+        t.start()
+        print 'Active Threads: %d' % threading.active_count()
 
     def run(self):
         #self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
@@ -202,10 +211,10 @@ class GUI(threading.Thread):
         # self.C.bind('<Configure>', self.create_grid)
 
         ####### Button Setup
-        MyButton1 = Button(self.top, text='Run', width=10, command=self.runMonitor, bg='white', relief=GROOVE)
+        MyButton1 = Button(self.top, text='Run', width=10, command=self.run_monitor, bg='white', relief=GROOVE)
         MyButton1.place(relx=0.2, rely=0.95, anchor='c')
 
-        MyButton2 = Button(self.top, text='Update', width=10, command=lambda: self.update_gui(), bg = 'white')
+        MyButton2 = Button(self.top, text='Update', width=10, command=lambda: self.update_gui(), bg='white')
         MyButton2.place(relx=0.4, rely=0.95, anchor='c')
 
         MyButton3 = Button(self.top, text='Quit', width=10, command=self.callback,bg='white')
@@ -218,22 +227,22 @@ class GUI(threading.Thread):
         self.DistanceEntry.insert(END, '2')
         self.DistanceEntry.place(x=WINDOW_HEIGHT/4, y=WINDOW_HEIGHT/10*8.5, anchor='c')
 
-        DistanceText = Tkinter.Label(self.top, text="Array Distance",font='Avenir\bNext', background = "#648FB1", fg = "white", height = 1)
-        DistanceText.place(x=WINDOW_HEIGHT/4, y=WINDOW_HEIGHT/5 *4, anchor="c")
+        DistanceText = Tkinter.Label(self.top, text='Array Distance',font='Avenir\bNext', background='#648FB1', fg = 'white', height = 1)
+        DistanceText.place(x=WINDOW_HEIGHT/4, y=WINDOW_HEIGHT/5 *4, anchor='c')
 
         self.NumArrayEntry = Tkinter.Entry(self.top, width = 8)
         self.NumArrayEntry.insert(END, '2')
         self.NumArrayEntry.place(x=WINDOW_HEIGHT/5*2.5, y=WINDOW_HEIGHT/10*8.5, anchor='c')
 
-        NumArrayText = Tkinter.Label(self.top, text="# Of Arrays", font='Avenir\bNext', background = "#648FB1", fg = "white", height = 1)
-        NumArrayText.place(x=WINDOW_HEIGHT/2, y=WINDOW_HEIGHT/5 *4, anchor="c")
+        NumArrayText = Tkinter.Label(self.top, text='# Of Arrays', font='Avenir\bNext', background = '#648FB1', fg = 'white', height = 1)
+        NumArrayText.place(x=WINDOW_HEIGHT/2, y=WINDOW_HEIGHT/5 *4, anchor='c')
 
         self.NumRunEntry = Tkinter.Entry(self.top, width = 8)
         self.NumRunEntry.insert(END, '2')
         self.NumRunEntry.place(x=WINDOW_HEIGHT/4*3, y=WINDOW_HEIGHT/10*8.5, anchor='c')
 
-        NumRunText = Tkinter.Label(self.top, text="# of Runs", font='Avenir\bNext', background = "#648FB1", fg = "white", height = 1)
-        NumRunText.place(x=WINDOW_HEIGHT/4*3, y=WINDOW_HEIGHT/5 *4, anchor="c")
+        NumRunText = Tkinter.Label(self.top, text='# of Runs', font='Avenir\bNext', background = '#648FB1', fg = 'white', height = 1)
+        NumRunText.place(x=WINDOW_HEIGHT/4*3, y=WINDOW_HEIGHT/5 *4, anchor='c')
 
         self.top.mainloop()
 

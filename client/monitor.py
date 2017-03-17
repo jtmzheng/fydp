@@ -91,8 +91,6 @@ class Monitor:
             stream.close()
         p.terminate()
 
-        return ret
-
 
 def tmp_callback():
     print ("Callback!\n")
