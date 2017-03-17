@@ -18,7 +18,7 @@ DEFAULT_HOSTNAME = '192.168.7.2'
 DEFAULT_HOSTNAME_2 = '192.168.8.2'
 DEFAULT_PORT = 5555
 
-SOUND_THRESHOLD = 300;
+SOUND_THRESHOLD = 600;
 
 
 WINDOW_HEIGHT = 600
@@ -29,7 +29,7 @@ array_dist = 2
 num_mics = 2
 
 
-ND = 12
+ND = 8
 TND = WINDOW_HEIGHT/ND
 
 baseHeight0 = 0.6 * ND * TND
@@ -171,12 +171,12 @@ class GUI(threading.Thread):
         print 'Active Threads: %d' % threading.active_count()
 
     def run(self):
-        #self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
-        #self.br_2 = BeagleReader(DEFAULT_HOSTNAME_2, DEFAULT_PORT, x=array_dist, y=0, l=0.3, samples=0)
+        self.br_1 = BeagleReader(DEFAULT_HOSTNAME, DEFAULT_PORT, x=0, y=0, l=0.3, samples=0)
+        self.br_2 = BeagleReader(DEFAULT_HOSTNAME_2, DEFAULT_PORT, x=array_dist, y=0, l=0.3, samples=0)
 
         #For Linux testing
-        self.br_1 = BeagleReader('localhost', 5555, x=0, y=0, l=0.3, samples=0)
-        self.br_2 = BeagleReader('localhost', 5556, x=array_dist, y=0, l=0.3, samples=0)
+        #self.br_1 = BeagleReader('localhost', 5555, x=0, y=0, l=0.3, samples=0)
+        #self.br_2 = BeagleReader('localhost', 5556, x=array_dist, y=0, l=0.3, samples=0)
 
         self.mbr = MultiBeagleReader([self.br_1, self.br_2], 0, 0, 100, 'Testing GUI')
 
