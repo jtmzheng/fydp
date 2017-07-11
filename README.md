@@ -3,7 +3,7 @@
 Sound source localization using a microphone array
 
 ## Members
-Samarth Kochhar
-Josh Bell
-Bill Lin
-Max Zheng
+- Samarth Kochhar
+- Josh Bell
+- Bill Lin
+- Max Zheng
