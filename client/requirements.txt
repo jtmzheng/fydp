@@ -40,7 +40,7 @@ pexpect==3.1
 Pillow==2.3.0
 piston-mini-client==0.7.5
 platformio==2.8.4
-psutil==1.2.1
+psutil==5.6.6
 PyAssimp==3.0.1264
 PyAudio==0.2.7
 pycrypto==2.6.1
