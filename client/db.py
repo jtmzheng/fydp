@@ -2,6 +2,7 @@ import sqlite3
 import time
 import io
 import numpy as np
+import threading
 
 def adapt_array(arr):
     """
@@ -26,7 +27,8 @@ sqlite3.register_adapter(np.ndarray, adapt_array)
 sqlite3.register_converter("array", convert_array)
 
 #TODO: Clean up this code lol
-conn = sqlite3.connect('./schema/test.db', detect_types=sqlite3.PARSE_DECLTYPES)
+conn = threading.local()
+#conn = sqlite3.connect('./schema/test.db', detect_types=sqlite3.PARSE_DECLTYPES)
 
 def with_cursor(func):
     """Decorator to inject transaction into each query
@@ -34,8 +36,13 @@ def with_cursor(func):
     def query(*args, **kwargs):
         """http://stackoverflow.com/a/19522634
         """
-        with conn:
-            return func(conn.cursor(), *args, **kwargs)
+        initialized = getattr(conn, 'initialized', None)
+        if initialized is None:
+            conn.initialized = True
+            conn.conn = sqlite3.connect('./schema/test.db', detect_types=sqlite3.PARSE_DECLTYPES)
+
+        with conn.conn:
+            return func(conn.conn.cursor(), *args, **kwargs)
     return query
 
 @with_cursor
