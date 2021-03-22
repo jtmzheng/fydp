@@ -21,6 +21,7 @@ DEFAULT_HOSTNAME = '192.168.7.2'
 DEFAULT_HOSTNAME_2 = '192.168.8.2'
 #DEFAULT_HOSTNAME = 'localhost'
 DEFAULT_PORT = 5555
+DEFUALT_NUM_SAMPLES = int(8388576/2/3)
 
 # Maps angle from microphone local coordinates to array coordinates (rotation to mic 0 axis)
 ANGLE_OFFSET = {
@@ -278,8 +279,8 @@ def run(argv):
     m = Monitor(300, runs)
 
     # NB: Use same port for both hosts
-    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=0)
-    br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=0)
+    br_1 = BeagleReader(hostname, portno, x=x1, y=y1, l=l1, samples=DEFUALT_NUM_SAMPLES)
+    br_2 = BeagleReader(hostname_2, portno, x=x2, y=y2, l=l2, samples=DEFUALT_NUM_SAMPLES)
 
     # NB: Enable below to test locally with test local server(s) running
     #br_1 = BeagleReader('localhost', 5555, x=x1, y=y1, l=l1, samples=0)
