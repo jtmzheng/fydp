@@ -47,7 +47,7 @@ pycrypto==2.6.1
 pycups==1.9.66
 pycurl==7.19.3
 pydot==1.0.28
-Pygments==1.6
+Pygments==2.7.4
 pygobject==3.12.0
 pygpgme==0.3
 pymongo==2.6.3
