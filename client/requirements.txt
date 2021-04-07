@@ -1,6 +1,6 @@
 adium-theme-ubuntu==0.3.4
 apt-xapian-index==0.45
-bottle==0.12.9
+bottle==0.12.19
 bzr==2.7.0.dev1
 catkin-pkg==0.2.10
 chardet==2.0.1
